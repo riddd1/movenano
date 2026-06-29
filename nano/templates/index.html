@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nano Banana · AI Image Transformer</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <!-- API key setup overlay -->
+  <div id="setup" class="overlay hidden">
+    <div class="setup-card">
+      <h2>🍌 Welcome</h2>
+      <p>Enter your Google Gemini API key to get started. It's stored locally in a <code>.env</code> file, so you only do this once.</p>
+      <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API key" autocomplete="off" />
+      <button id="saveKeyBtn" class="btn primary">Save &amp; Continue</button>
+      <p id="setupError" class="error-text"></p>
+      <p class="hint">Get a key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.</p>
+    </div>
+  </div>
+
+  <main id="app" class="hidden">
+    <header>
+      <h1>🍌 Nano Banana</h1>
+      <p class="subtitle">AI image-to-image transformation · run several at once</p>
+    </header>
+
+    <section id="jobs"></section>
+
+    <button id="addJobBtn" class="btn ghost add-job">+ Add another image</button>
+
+    <section class="controls">
+      <button id="generateBtn" class="btn primary big">Generate all</button>
+      <p id="costMeter" class="cost-meter">~$0.04 per generation · <span id="genCount">0</span> this session · ~$<span id="costTotal">0.00</span> total</p>
+      <p id="error" class="error-text"></p>
+    </section>
+  </main>
+
+  <!-- Template for one job (image + prompt + result) -->
+  <template id="jobTemplate">
+    <div class="job">
+      <div class="job-head">
+        <span class="job-title">Image 1</span>
+        <button class="remove-job" type="button" title="Remove this image">✕</button>
+      </div>
+      <div class="workspace">
+        <div class="panel">
+          <h3>Source image</h3>
+          <div class="drop-zone">
+            <input type="file" class="file-input" accept="image/*" hidden />
+            <div class="drop-prompt">
+              <span class="drop-icon">⬆</span>
+              <p>Drag &amp; drop an image here</p>
+              <p class="muted">or click to browse · max 20MB</p>
+            </div>
+            <img class="preview source-preview hidden" alt="Source preview" />
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Result</h3>
+          <div class="result-zone">
+            <div class="spinner hidden"></div>
+            <div class="result-placeholder muted">Your transformed image will appear here.</div>
+            <img class="preview result-image hidden" alt="Generated result" />
+          </div>
+          <a class="btn primary download-btn hidden" download>Download</a>
+        </div>
+      </div>
+      <div class="preset-row">
+        <label>Preset</label>
+        <select class="preset-select">
+          <option value="">✏️ Custom prompt…</option>
+          <option value="bg">Background Swap</option>
+          <option value="color">Color Swap</option>
+          <option value="remix">Full Remix</option>
+        </select>
+      </div>
+      <textarea class="prompt-input" rows="3" placeholder="Pick a preset above, or describe your own transformation…"></textarea>
+      <p class="job-error error-text"></p>
+    </div>
+  </template>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

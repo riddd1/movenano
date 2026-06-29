@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fix + Move</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0c0c0e;
+      --surface: #16161a;
+      --surface2:#1e1e26;
+      --border:  #2c2c38;
+      --accent:  #7c3aed;
+      --accent2: #a78bfa;
+      --text:    #e2e2ea;
+      --muted:   #64647a;
+      --success: #22c55e;
+      --error:   #ef4444;
+      --r:       12px;
+    }
+
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Overlay ── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(8,9,12,.93);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px; z-index: 50;
+    }
+    .overlay.hidden { display: none; }
+    .setup-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 32px; max-width: 440px; width: 100%;
+    }
+    .setup-card h2 { margin-bottom: 10px; font-size: 1.3rem; }
+    .setup-card p  { color: var(--muted); font-size: .9rem; line-height: 1.6; margin-bottom: 16px; }
+    .setup-card input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); padding: 12px 14px;
+      font-size: 1rem; margin-bottom: 12px;
+    }
+    .setup-card input:focus { outline: none; border-color: var(--accent); }
+    .hint { font-size: .82rem !important; color: var(--muted) !important; margin-top: 12px !important; }
+    a { color: var(--accent2); }
+
+    /* ── Layout ── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 40px 20px 80px; }
+    header { text-align: center; margin-bottom: 40px; }
+    header h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -.03em; }
+    header p   { color: var(--muted); font-size: .88rem; margin-top: 6px; }
+
+    .section-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .section-head h2 { font-size: 1rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+    .pill {
+      font-size: .72rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+      padding: 3px 10px; border-radius: 99px;
+      background: rgba(124,58,237,.18); color: var(--accent2); border: 1px solid rgba(124,58,237,.35);
+    }
+    .divider {
+      display: flex; align-items: center; gap: 16px; margin: 36px 0;
+      color: var(--muted); font-size: .8rem; letter-spacing: .06em; text-transform: uppercase;
+    }
+    .divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+
+    /* ── Shared buttons ── */
+    .btn {
+      display: inline-block; border: none; border-radius: 10px;
+      padding: 11px 20px; font-size: .95rem; font-weight: 600;
+      cursor: pointer; text-decoration: none; text-align: center;
+      transition: opacity .15s, transform .05s;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary { background: var(--accent); color: #fff; }
+    .btn.primary:hover { opacity: .88; }
+    .btn.primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+    .btn.ghost { background: transparent; color: var(--accent2); border: 1px dashed var(--border); }
+    .btn.ghost:hover { border-color: var(--accent); }
+    .btn.ghost:disabled { opacity: .4; cursor: not-allowed; }
+    .btn.success-btn { background: var(--success); color: #fff; }
+    .btn.success-btn:hover { opacity: .88; }
+    .btn.animate-btn {
+      background: rgba(124,58,237,.15); color: var(--accent2);
+      border: 1px solid rgba(124,58,237,.4); font-size: .82rem; padding: 7px 12px;
+    }
+    .btn.animate-btn:hover { background: rgba(124,58,237,.28); }
+    .btn.wide { width: 100%; margin-top: 10px; }
+    .btn.big-wide { width: 100%; padding: 14px; font-size: 1rem; margin-top: 12px; }
+
+    /* ── Shared helpers ── */
+    .hidden { display: none !important; }
+    .error-text { color: var(--error); font-size: .85rem; margin-top: 8px; min-height: 1.2em; }
+
+    /* ─────────────────────────────────────────
+       NANO — job cards
+    ───────────────────────────────────────── */
+    .job {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 18px; margin-bottom: 14px;
+    }
+    .job-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .job-title { font-weight: 600; font-size: .95rem; }
+    .remove-job {
+      background: transparent; border: 1px solid var(--border); color: var(--muted);
+      width: 28px; height: 28px; border-radius: 8px; cursor: pointer; font-size: .85rem;
+    }
+    .remove-job:hover { color: var(--error); border-color: var(--error); }
+
+    .workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .panel {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px;
+    }
+    .panel h3 { margin-bottom: 10px; font-size: .72rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+
+    .drop-zone {
+      position: relative; min-height: 220px; border-radius: 8px;
+      border: 2px dashed var(--border); background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      text-align: center; cursor: pointer; overflow: hidden;
+      transition: border-color .15s, background .15s;
+    }
+    .drop-zone.dragover { border-color: var(--accent); background: rgba(124,58,237,.07); }
+    .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop-prompt { padding: 24px; pointer-events: none; }
+    .drop-icon { font-size: 2rem; display: block; margin-bottom: 8px; }
+    .drop-prompt p { margin: 4px 0; font-size: .88rem; color: var(--muted); }
+
+    .result-zone {
+      min-height: 220px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--bg); display: flex; align-items: center; justify-content: center;
+      text-align: center; overflow: hidden; position: relative;
+    }
+    .result-placeholder { color: var(--muted); font-size: .88rem; padding: 24px; }
+    .preview-img { max-width: 100%; max-height: 220px; object-fit: contain; border-radius: 6px; }
+
+    .spinner {
+      width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .8s linear infinite; position: absolute;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .preset-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+    .preset-row label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+    .preset-select {
+      flex: 1; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); padding: 9px 11px;
+      font-size: .9rem; font-family: inherit; cursor: pointer;
+    }
+    .preset-select:focus { outline: none; border-color: var(--accent); }
+
+    textarea.prompt-input {
+      width: 100%; resize: vertical; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+      padding: 10px 12px; font-size: .92rem; font-family: inherit; margin-top: 10px;
+    }
+    textarea.prompt-input:focus { outline: none; border-color: var(--accent); }
+
+    .result-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .nano-controls {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 18px; margin-top: 4px;
+    }
+    .cost-meter { color: var(--muted); font-size: .82rem; margin-top: 10px; text-align: center; }
+    .cost-meter span { color: var(--accent2); font-weight: 600; }
+
+    /* ─────────────────────────────────────────
+       MOVE — multi-job cards (compact)
+    ───────────────────────────────────────── */
+    .move-job {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 16px; margin-bottom: 14px;
+    }
+
+    /* top row: title + remove */
+    .move-job-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .move-job-title { font-weight: 600; font-size: .95rem; }
+
+    /* main row: thumb | settings */
+    .move-body { display: grid; grid-template-columns: 120px 1fr; gap: 16px; align-items: start; }
+
+    /* ── Thumbnail drop zone ── */
+    .move-drop {
+      position: relative; width: 120px; height: 120px; border-radius: 10px;
+      border: 2px dashed var(--border); background: var(--surface2);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; overflow: hidden; transition: border-color .15s;
+      font-size: .78rem; color: var(--muted); text-align: center; gap: 6px;
+    }
+    .move-drop:hover, .move-drop.over { border-color: var(--accent); }
+    .move-drop input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .move-drop .drop-icon-sm { font-size: 1.6rem; }
+
+    /* thumbnail shown after file picked */
+    .move-thumb {
+      position: relative; width: 120px; height: 120px; border-radius: 10px;
+      overflow: hidden; border: 1px solid var(--border); flex-shrink: 0;
+    }
+    .move-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .move-thumb-rm {
+      position: absolute; top: 4px; right: 4px;
+      background: rgba(0,0,0,.65); border: none; color: #fff;
+      border-radius: 6px; width: 22px; height: 22px; cursor: pointer; font-size: .75rem;
+    }
+    .move-thumb-rm:hover { background: var(--error); }
+
+    /* ── Compact settings ── */
+    .move-settings { display: flex; flex-direction: column; gap: 10px; }
+    .move-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .move-field { display: flex; flex-direction: column; gap: 5px; }
+    .move-label {
+      font-size: .68rem; font-weight: 600; letter-spacing: .07em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .move-slider-row { display: flex; align-items: center; gap: 8px; }
+    .move-slider-row input[type=range] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+    .move-val { font-size: .78rem; font-weight: 700; color: var(--accent2); min-width: 28px; text-align: right; }
+
+    .move-fps-group, .move-dir-group { display: flex; gap: 4px; }
+    .move-fps-group button, .move-dir-group button {
+      flex: 1; padding: 5px 0; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 7px;
+      color: var(--muted); font-size: .8rem; font-weight: 500; cursor: pointer;
+    }
+    .move-fps-group button.active,
+    .move-dir-group button.active { background: rgba(124,58,237,.2); border-color: var(--accent); color: var(--accent2); }
+
+    .move-seed-row { display: flex; gap: 5px; }
+    .move-seed-row input[type=number] {
+      flex: 1; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 7px; color: var(--text); padding: 5px 8px;
+      font-size: .82rem; appearance: textfield;
+    }
+    .move-seed-row input[type=number]:focus { outline: none; border-color: var(--accent); }
+    .move-rand-btn {
+      padding: 5px 8px; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 7px; color: var(--muted); font-size: .85rem; cursor: pointer; flex-shrink: 0;
+    }
+    .move-rand-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    /* ── Per-job result / progress ── */
+    .move-below { margin-top: 12px; }
+    .move-progress-bar {
+      display: none; margin-bottom: 8px;
+    }
+    .move-prog-labels { display: flex; justify-content: space-between; font-size: .75rem; color: var(--muted); margin-bottom: 5px; }
+    .move-prog-track { width: 100%; height: 4px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
+    .move-prog-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 99px; transition: width .4s; }
+
+    .move-result { display: none; }
+    .move-result video { width: 100%; max-height: 200px; border-radius: 8px; border: 1px solid var(--border); object-fit: contain; background: #000; }
+    .move-result-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+    .move-err { color: var(--error); font-size: .82rem; margin-top: 6px; }
+    .move-gen-btn { width: 100%; margin-top: 10px; }
+
+    /* ── Move controls bar ── */
+    .move-controls {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 18px; margin-top: 4px;
+    }
+
+    @media (max-width: 640px) {
+      .workspace { grid-template-columns: 1fr; }
+      .move-body  { grid-template-columns: 1fr; }
+      .move-drop, .move-thumb { width: 100%; height: 120px; }
+      .move-row   { grid-template-columns: 1fr; }
+      header h1   { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- API key setup overlay -->
+<div id="setup" class="overlay hidden">
+  <div class="setup-card">
+    <h2>Welcome to Fix + Move</h2>
+    <p>The Fix tool uses Google Gemini to transform your images. Enter your API key to get started — it's saved locally and you only need to do this once.</p>
+    <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API key" autocomplete="off" />
+    <button id="saveKeyBtn" class="btn primary wide">Save &amp; Continue</button>
+    <p id="setupError" class="error-text"></p>
+    <p class="hint">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. Move works without a key.</p>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <div class="page">
+
+    <header>
+      <h1>Fix + Move</h1>
+      <p>Transform images · animate with handheld camera motion</p>
+    </header>
+
+    <!-- ── FIX ── -->
+    <div class="section-head">
+      <h2>Fix</h2>
+      <span class="pill">AI image editing</span>
+    </div>
+
+    <div id="jobs"></div>
+    <button id="addJobBtn" class="btn ghost wide" style="margin-bottom:14px">+ Add another image</button>
+    <div class="nano-controls">
+      <button id="nanoGenerateBtn" class="btn primary big-wide">Generate all</button>
+      <p class="cost-meter">~$0.04 per generation · <span id="genCount">0</span> this session · ~$<span id="costTotal">0.00</span></p>
+      <p id="nanoError" class="error-text"></p>
+    </div>
+
+    <div class="divider">animate with move</div>
+
+    <!-- ── MOVE ── -->
+    <div class="section-head">
+      <h2>Move</h2>
+      <span class="pill">handheld camera effect</span>
+    </div>
+
+    <div id="moveJobs"></div>
+    <button id="addMoveJobBtn" class="btn ghost wide" style="margin-bottom:14px">+ Add another video</button>
+    <div class="move-controls">
+      <button id="moveGenerateAllBtn" class="btn primary big-wide">Generate all videos</button>
+      <p id="moveGlobalError" class="error-text"></p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Nano job template ── -->
+<template id="jobTemplate">
+  <div class="job">
+    <div class="job-head">
+      <span class="job-title">Image 1</span>
+      <button class="remove-job" type="button">✕</button>
+    </div>
+    <div class="workspace">
+      <div class="panel">
+        <h3>Source</h3>
+        <div class="drop-zone">
+          <input type="file" class="file-input" accept="image/*" hidden />
+          <div class="drop-prompt">
+            <span class="drop-icon">⬆</span>
+            <p>Drop image here</p>
+            <p style="font-size:.78rem;color:var(--muted)">or click · max 20MB</p>
+          </div>
+          <img class="preview-img source-img hidden" alt="source" />
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Result</h3>
+        <div class="result-zone">
+          <div class="spinner hidden"></div>
+          <div class="result-placeholder">Result appears here.</div>
+          <img class="preview-img result-img hidden" alt="result" />
+        </div>
+        <div class="result-actions">
+          <a class="btn primary hidden result-download" download style="flex:1;text-align:center;font-size:.88rem;padding:9px 14px">Download</a>
+          <button class="btn animate-btn hidden result-animate">→ Animate</button>
+        </div>
+      </div>
+    </div>
+    <div class="preset-row">
+      <label>Preset</label>
+      <select class="preset-select">
+        <option value="">✏️ Custom prompt…</option>
+        <option value="bg">Background Swap</option>
+        <option value="color">Color Swap</option>
+        <option value="remix">Full Remix</option>
+      </select>
+    </div>
+    <textarea class="prompt-input" rows="3" placeholder="Pick a preset, or describe your own transformation…"></textarea>
+    <p class="job-error error-text"></p>
+  </div>
+</template>
+
+<!-- ── Move job template ── -->
+<template id="moveJobTemplate">
+  <div class="move-job">
+    <div class="move-job-head">
+      <span class="move-job-title">Video 1</span>
+      <button class="move-remove-job btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);width:28px;height:28px;padding:0;font-size:.85rem;border-radius:8px" type="button">✕</button>
+    </div>
+
+    <div class="move-body">
+      <!-- Thumbnail / drop -->
+      <div class="move-drop">
+        <input type="file" class="move-file-input" accept="image/*" hidden>
+        <span class="drop-icon-sm">📷</span>
+        <span>Drop image</span>
+      </div>
+      <div class="move-thumb hidden">
+        <img class="move-thumb-img" src="" alt="">
+        <button class="move-thumb-rm" type="button" title="Remove">✕</button>
+      </div>
+
+      <!-- Settings -->
+      <div class="move-settings">
+        <div class="move-row">
+          <div class="move-field">
+            <div class="move-label">Duration</div>
+            <div class="move-slider-row">
+              <input type="range" class="dur-slider" min="1" max="60" value="6" step="1">
+              <span class="move-val dur-val">6s</span>
+            </div>
+          </div>
+          <div class="move-field">
+            <div class="move-label">Intensity</div>
+            <div class="move-slider-row">
+              <input type="range" class="int-slider" min="1" max="10" value="5" step="1">
+              <span class="move-val int-val">5</span>
+            </div>
+          </div>
+        </div>
+        <div class="move-row">
+          <div class="move-field">
+            <div class="move-label">Speed</div>
+            <div class="move-slider-row">
+              <input type="range" class="spd-slider" min="1" max="10" value="5" step="1">
+              <span class="move-val spd-val">5</span>
+            </div>
+          </div>
+          <div class="move-field">
+            <div class="move-label">Frame Rate</div>
+            <div class="move-fps-group fps-group">
+              <button data-fps="24">24</button>
+              <button data-fps="30" class="active">30</button>
+              <button data-fps="60">60</button>
+            </div>
+          </div>
+        </div>
+        <div class="move-row">
+          <div class="move-field">
+            <div class="move-label">Direction</div>
+            <div class="move-dir-group dir-group">
+              <button data-dir="horizontal">↔</button>
+              <button data-dir="balanced" class="active">⊕</button>
+              <button data-dir="vertical">↕</button>
+            </div>
+          </div>
+          <div class="move-field">
+            <div class="move-label">Seed</div>
+            <div class="move-seed-row">
+              <input type="number" class="seed-input" value="42" min="0" max="9999999">
+              <button class="move-rand-btn rand-btn" title="Randomize">🎲</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /move-body -->
+
+    <div class="move-below">
+      <div class="move-progress-bar">
+        <div class="move-prog-labels">
+          <span class="prog-label">Generating…</span>
+          <span class="prog-pct">0%</span>
+        </div>
+        <div class="move-prog-track"><div class="move-prog-fill"></div></div>
+      </div>
+      <div class="move-result">
+        <video controls autoplay loop muted playsinline></video>
+        <div class="move-result-actions">
+          <a class="btn success-btn" download style="flex:1;text-align:center;font-size:.88rem;padding:9px 14px">⬇ Download MP4</a>
+        </div>
+      </div>
+      <p class="move-err"></p>
+      <button class="btn primary move-gen-btn" disabled>Generate video</button>
+    </div>
+  </div>
+</template>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  NANO
+// ═══════════════════════════════════════════════════
+
+const PRESETS = {
+  bg: `Remove any text, captions, play buttons, social media icons, phone status bar elements (battery icon, signal bars, wifi icon, clock/time, carrier name, notch, dynamic island), and any other UI overlay from the image. Fill those areas with what would naturally be behind them.
+
+Recreate this exact photo as a direct reference. Keep ALL clothing items the exact same color, style, and type. Keep all brand logos on clothing and shoes. Keep the same camera angle and overall composition.
+
+Change ONLY:
+- The background surface — if it is a bedsheet change to a different style and color bedsheet, if it is a floor change to a different floor type and color, if it is a table change to a different table surface
+- Slightly reposition any small items like scrunchies, beauty products, sunglasses, or accessories so the layout feels fresh but still natural
+- Replace any accessories (jewelry, watches, hair clips, beauty products) with different alternatives that match and complement the outfit's color palette
+
+Soft natural window daylight, muted true-to-life colors, gentle realistic contact shadows under fabric edges. Visible fabric texture, natural wrinkles, fold lines and seams. Casual handheld iPhone snapshot, slightly soft not tack-sharp, faint sensor grain, warm indoor auto white balance. Avoid: oversaturated colors, HDR glow, harsh studio lighting, 3D render, CGI, plastic look. The output must contain zero text and zero icons.`,
+
+  color: `Remove any text, captions, play buttons, social media icons, phone status bar elements (battery icon, signal bars, wifi icon, clock/time, carrier name, notch, dynamic island), and any other UI overlay from the image. Fill those areas with what would naturally be behind them.
+
+Recreate this exact photo as a direct reference. Keep the EXACT same background, surface, camera angle, composition, and layout. Do NOT change the background at all. Keep all brand logos on clothing and shoes.
+
+Change ONLY:
+- Change the color of the clothing items to a different attractive color that is NOT the current color — pick a color that coordinates well across all visible garments so the outfit still looks intentional and stylish together
+- Replace any accessories (jewelry, watches, hair clips, beauty products) with different alternatives that match and complement the NEW clothing color
+- Keep all clothing styles, types, fits, folds, and positions identical — only the color changes
+
+Soft natural window daylight, muted true-to-life colors, gentle realistic contact shadows under fabric edges. Visible fabric texture, natural wrinkles, fold lines and seams. Casual handheld iPhone snapshot, slightly soft not tack-sharp, faint sensor grain, warm indoor auto white balance. Avoid: oversaturated colors, HDR glow, harsh studio lighting, 3D render, CGI, plastic look. The output must contain zero text and zero icons.`,
+
+  remix: `Remove any text, captions, play buttons, social media icons, phone status bar elements (battery icon, signal bars, wifi icon, clock/time, carrier name, notch, dynamic island), and any other UI overlay from the image. Fill those areas with what would naturally be behind them.
+
+Recreate this exact photo as a direct reference. Keep the same camera angle and overall composition. Keep all brand logos on clothing and shoes.
+
+Change ALL of these:
+- The background surface — if it is a bedsheet change to a different style and color bedsheet, if it is a floor change to a different floor type and color, if it is a table change to a different table surface
+- Change the color of the clothing items to a different attractive color that is NOT the current color — pick a color that coordinates well across all visible garments so the outfit still looks intentional and stylish together
+- Slightly reposition any small items like scrunchies, beauty products, sunglasses, or accessories so the layout feels fresh but still natural
+- Replace any accessories (jewelry, watches, hair clips, beauty products) with different alternatives that match and complement the NEW clothing color and NEW background
+- Keep all clothing styles, types, fits, folds, and positions identical — only the colors change
+
+Soft natural window daylight, muted true-to-life colors, gentle realistic contact shadows under fabric edges. Visible fabric texture, natural wrinkles, fold lines and seams. Casual handheld iPhone snapshot, slightly soft not tack-sharp, faint sensor grain, warm indoor auto white balance. Avoid: oversaturated colors, HDR glow, harsh studio lighting, 3D render, CGI, plastic look. The output must contain zero text and zero icons.`,
+};
+
+const MAX_BYTES = 20 * 1024 * 1024;
+const COST_EACH = 0.039;
+const MAX_CONC  = 2;
+
+const setupEl     = document.getElementById("setup");
+const appEl       = document.getElementById("app");
+const apiKeyInput = document.getElementById("apiKeyInput");
+const saveKeyBtn  = document.getElementById("saveKeyBtn");
+const setupError  = document.getElementById("setupError");
+const jobsEl      = document.getElementById("jobs");
+const addJobBtn   = document.getElementById("addJobBtn");
+const nanoGenBtn  = document.getElementById("nanoGenerateBtn");
+const nanoErrEl   = document.getElementById("nanoError");
+const genCountEl  = document.getElementById("genCount");
+const costTotalEl = document.getElementById("costTotal");
+
+let genCount = 0;
+const nanoJobs = [];
+
+async function nanoInit() {
+  try {
+    const r = await fetch("/api/status");
+    const d = await r.json();
+    if (d.configured) showApp();
+    else setupEl.classList.remove("hidden");
+  } catch { setupEl.classList.remove("hidden"); }
+}
+
+function showApp() {
+  setupEl.classList.add("hidden");
+  appEl.classList.remove("hidden");
+  if (!jobsEl.children.length) addNanoJob();
+  if (!moveJobsEl.children.length) addMoveJob();
+}
+
+saveKeyBtn.addEventListener("click", async () => {
+  const key = apiKeyInput.value.trim();
+  setupError.textContent = "";
+  if (!key) { setupError.textContent = "Please enter your API key."; return; }
+  saveKeyBtn.disabled = true; saveKeyBtn.textContent = "Saving…";
+  try {
+    const r = await fetch("/api/save-key", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({api_key: key}),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Could not save key.");
+    showApp();
+  } catch (e) { setupError.textContent = e.message; }
+  finally { saveKeyBtn.disabled = false; saveKeyBtn.textContent = "Save & Continue"; }
+});
+apiKeyInput.addEventListener("keydown", e => { if (e.key === "Enter") saveKeyBtn.click(); });
+
+function nanoRenumber() {
+  [...jobsEl.children].forEach((card, i) => {
+    card.querySelector(".job-title").textContent = `Image ${i + 1}`;
+    card.querySelector(".remove-job").style.display = jobsEl.children.length > 1 ? "" : "none";
+  });
+}
+
+function addNanoJob() {
+  const card = document.getElementById("jobTemplate").content.firstElementChild.cloneNode(true);
+  const job  = setupNanoJob(card);
+  nanoJobs.push(job);
+  jobsEl.appendChild(card);
+  nanoRenumber();
+  return job;
+}
+
+function setupNanoJob(card) {
+  const dropZone     = card.querySelector(".drop-zone");
+  const fileInput    = card.querySelector(".file-input");
+  const dropPrompt   = card.querySelector(".drop-prompt");
+  const sourceImg    = card.querySelector(".source-img");
+  const promptInput  = card.querySelector(".prompt-input");
+  const presetSelect = card.querySelector(".preset-select");
+  const spinner      = card.querySelector(".spinner");
+  const placeholder  = card.querySelector(".result-placeholder");
+  const resultImg    = card.querySelector(".result-img");
+  const dlBtn        = card.querySelector(".result-download");
+  const animBtn      = card.querySelector(".result-animate");
+  const jobErr       = card.querySelector(".job-error");
+  const removeBtn    = card.querySelector(".remove-job");
+
+  const job = { card, file: null, busy: false, resultDataUrl: null, resultFilename: null };
+
+  function setFile(f) {
+    jobErr.textContent = "";
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { jobErr.textContent = "Please choose an image file."; return; }
+    if (f.size > MAX_BYTES) { jobErr.textContent = "Image too large. Max 20MB."; return; }
+    job.file = f;
+    const reader = new FileReader();
+    reader.onload = e => { sourceImg.src = e.target.result; sourceImg.classList.remove("hidden"); dropPrompt.classList.add("hidden"); };
+    reader.readAsDataURL(f);
+  }
+
+  dropZone.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", e => setFile(e.target.files[0]));
+  ["dragenter","dragover"].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add("dragover"); }));
+  ["dragleave","drop"].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove("dragover"); }));
+  dropZone.addEventListener("drop", e => setFile(e.dataTransfer.files[0]));
+
+  presetSelect.addEventListener("change", () => { const p = PRESETS[presetSelect.value]; if (p) promptInput.value = p; });
+  promptInput.addEventListener("input",   () => { if (presetSelect.value && promptInput.value !== PRESETS[presetSelect.value]) presetSelect.value = ""; });
+
+  removeBtn.addEventListener("click", () => {
+    const i = nanoJobs.indexOf(job);
+    if (i !== -1) nanoJobs.splice(i, 1);
+    card.remove(); nanoRenumber();
+  });
+
+  animBtn.addEventListener("click", () => {
+    if (!job.resultDataUrl) return;
+    const mj = addMoveJob();
+    sendToMoveJob(mj, job.resultDataUrl, job.resultFilename || "nano-result.png");
+    document.getElementById("moveJobs").lastElementChild.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  job.run = async function() {
+    jobErr.textContent = "";
+    if (!job.file)                { jobErr.textContent = "Upload an image first."; return false; }
+    if (!promptInput.value.trim()){ jobErr.textContent = "Enter a prompt first.";  return false; }
+    job.busy = true;
+    spinner.classList.remove("hidden");
+    resultImg.classList.add("hidden"); dlBtn.classList.add("hidden"); animBtn.classList.add("hidden"); placeholder.classList.add("hidden");
+    const form = new FormData();
+    form.append("image", job.file); form.append("prompt", promptInput.value.trim());
+    try {
+      const r = await fetch("/api/generate", {method:"POST", body:form});
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Generation failed.");
+      resultImg.src = d.image; resultImg.classList.remove("hidden");
+      dlBtn.href = d.download_url; dlBtn.setAttribute("download", d.filename || "result.png"); dlBtn.classList.remove("hidden");
+      job.resultDataUrl = d.image; job.resultFilename = d.filename || "nano-result.png";
+      animBtn.classList.remove("hidden");
+      return true;
+    } catch (e) { jobErr.textContent = e.message; placeholder.classList.remove("hidden"); return false; }
+    finally { job.busy = false; spinner.classList.add("hidden"); }
+  };
+  return job;
+}
+
+addJobBtn.addEventListener("click", addNanoJob);
+
+nanoGenBtn.addEventListener("click", async () => {
+  nanoErrEl.textContent = "";
+  if (!nanoJobs.length) return;
+  nanoGenBtn.disabled = true; addJobBtn.disabled = true; nanoGenBtn.textContent = "Generating…";
+  const queue = [...nanoJobs]; let succeeded = 0;
+  async function worker() { while (queue.length) { const j = queue.shift(); if (await j.run()) succeeded++; } }
+  await Promise.all(Array.from({length: Math.min(MAX_CONC, nanoJobs.length)}, worker));
+  genCount += succeeded;
+  genCountEl.textContent = genCount; costTotalEl.textContent = (genCount * COST_EACH).toFixed(2);
+  nanoGenBtn.disabled = false; addJobBtn.disabled = false; nanoGenBtn.textContent = "Generate all";
+});
+
+
+// ═══════════════════════════════════════════════════
+//  MOVE — multi-job
+// ═══════════════════════════════════════════════════
+
+const moveJobsEl      = document.getElementById("moveJobs");
+const addMoveJobBtn   = document.getElementById("addMoveJobBtn");
+const moveGenAllBtn   = document.getElementById("moveGenerateAllBtn");
+const moveJobs        = [];
+
+function moveRenumber() {
+  [...moveJobsEl.children].forEach((card, i) => {
+    card.querySelector(".move-job-title").textContent = `Video ${i + 1}`;
+    card.querySelector(".move-remove-job").style.display = moveJobsEl.children.length > 1 ? "" : "none";
+  });
+}
+
+function addMoveJob() {
+  const card = document.getElementById("moveJobTemplate").content.firstElementChild.cloneNode(true);
+  const job  = setupMoveJob(card);
+  moveJobs.push(job);
+  moveJobsEl.appendChild(card);
+  moveRenumber();
+  return job;
+}
+
+function setupMoveJob(card) {
+  const dropEl    = card.querySelector(".move-drop");
+  const fileInput = card.querySelector(".move-file-input");
+  const thumbBox  = card.querySelector(".move-thumb");
+  const thumbImg  = card.querySelector(".move-thumb-img");
+  const thumbRm   = card.querySelector(".move-thumb-rm");
+  const removeBtn = card.querySelector(".move-remove-job");
+  const genBtn    = card.querySelector(".move-gen-btn");
+  const progBar   = card.querySelector(".move-progress-bar");
+  const progFill  = card.querySelector(".move-prog-fill");
+  const progPct   = card.querySelector(".prog-pct");
+  const progLabel = card.querySelector(".prog-label");
+  const resultDiv = card.querySelector(".move-result");
+  const resultVid = card.querySelector(".move-result video");
+  const dlBtn     = card.querySelector(".move-result-actions a");
+  const errEl     = card.querySelector(".move-err");
+
+  // sliders
+  const durSlider = card.querySelector(".dur-slider");
+  const intSlider = card.querySelector(".int-slider");
+  const spdSlider = card.querySelector(".spd-slider");
+  const durVal    = card.querySelector(".dur-val");
+  const intVal    = card.querySelector(".int-val");
+  const spdVal    = card.querySelector(".spd-val");
+  const seedInput = card.querySelector(".seed-input");
+  const randBtn   = card.querySelector(".rand-btn");
+
+  durSlider.addEventListener("input", () => durVal.textContent = durSlider.value + "s");
+  intSlider.addEventListener("input", () => intVal.textContent = intSlider.value);
+  spdSlider.addEventListener("input", () => spdVal.textContent = spdSlider.value);
+
+  let fps = 30, direction = "balanced";
+
+  card.querySelectorAll(".fps-group button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      card.querySelectorAll(".fps-group button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active"); fps = parseInt(btn.dataset.fps);
+    });
+  });
+  card.querySelectorAll(".dir-group button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      card.querySelectorAll(".dir-group button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active"); direction = btn.dataset.dir;
+    });
+  });
+
+  randBtn.addEventListener("click", () => {
+    if (randBtn.dataset.spinning === "1") return;
+    randBtn.dataset.spinning = "1";
+    const finalSeed = Math.floor(Math.random() * 9999999);
+    const finalInt  = Math.floor(Math.random() * 10) + 1;
+    const finalSpd  = Math.floor(Math.random() * 10) + 1;
+    const dirs      = ["horizontal","balanced","vertical"];
+    const finalDir  = dirs[Math.floor(Math.random() * 3)];
+    seedInput.value = finalSeed;
+    intSlider.value = finalInt; intVal.textContent = finalInt;
+    spdSlider.value = finalSpd; spdVal.textContent = finalSpd;
+    const TOTAL = 1400; let delay = 80, elapsed = 0, lastIdx = -1;
+    function setDir(idx) {
+      const d = dirs[idx];
+      card.querySelectorAll(".dir-group button").forEach(b => b.classList.toggle("active", b.dataset.dir === d));
+    }
+    function hop() {
+      let idx; do { idx = Math.floor(Math.random()*3); } while (idx === lastIdx);
+      lastIdx = idx; setDir(idx); elapsed += delay; delay = Math.min(delay+14, 260);
+      if (elapsed < TOTAL) setTimeout(hop, delay);
+      else { setDir(dirs.indexOf(finalDir)); direction = finalDir; randBtn.dataset.spinning = "0"; randBtn.textContent = "✓"; setTimeout(() => randBtn.textContent = "🎲", 700); }
+    }
+    hop();
+  });
+
+  const job = { card, file: null, poll: null };
+
+  function setFile(f) {
+    if (!f || !f.type.startsWith("image/")) return;
+    job.file = f;
+    thumbImg.src = URL.createObjectURL(f);
+    dropEl.classList.add("hidden");
+    thumbBox.classList.remove("hidden");
+    genBtn.disabled = false;
+    errEl.textContent = "";
+  }
+  function clearFile() {
+    job.file = null; fileInput.value = "";
+    thumbBox.classList.add("hidden");
+    dropEl.classList.remove("hidden");
+    genBtn.disabled = true;
+    clearResult();
+  }
+
+  dropEl.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", e => setFile(e.target.files[0]));
+  dropEl.addEventListener("dragover",  e => { e.preventDefault(); dropEl.classList.add("over"); });
+  dropEl.addEventListener("dragleave", () => dropEl.classList.remove("over"));
+  dropEl.addEventListener("drop", e => { e.preventDefault(); dropEl.classList.remove("over"); setFile(e.dataTransfer.files[0]); });
+  thumbRm.addEventListener("click", clearFile);
+
+  removeBtn.addEventListener("click", () => {
+    if (job.poll) clearInterval(job.poll);
+    const i = moveJobs.indexOf(job);
+    if (i !== -1) moveJobs.splice(i, 1);
+    card.remove(); moveRenumber();
+  });
+
+  function setProgress(pct, label) {
+    progFill.style.width = pct + "%";
+    progPct.textContent  = pct + "%";
+    progLabel.textContent = label;
+  }
+  function clearResult() {
+    if (job.poll) { clearInterval(job.poll); job.poll = null; }
+    progBar.style.display = "none";
+    resultDiv.style.display = "none";
+    resultVid.src = "";
+  }
+  function showResult(jobId) {
+    progBar.style.display = "none";
+    resultDiv.style.display = "block";
+    resultVid.src = `/move/preview/${jobId}`;
+    dlBtn.href    = `/move/download/${jobId}`;
+    genBtn.disabled = false; genBtn.textContent = "Generate video";
+  }
+
+  job.run = async function() {
+    if (!job.file) { errEl.textContent = "Upload an image first."; return false; }
+    errEl.textContent = ""; clearResult();
+    const fd = new FormData();
+    fd.append("image",     job.file);
+    fd.append("duration",  durSlider.value);
+    fd.append("intensity", (parseInt(intSlider.value) / 5.0).toFixed(2));
+    fd.append("speed",     spdSlider.value);
+    fd.append("seed",      seedInput.value);
+    fd.append("fps",       fps);
+    fd.append("direction", direction);
+
+    genBtn.disabled = true; genBtn.textContent = "Uploading…";
+    progBar.style.display = "block"; setProgress(0, "Uploading…");
+
+    try {
+      const r = await fetch("/move/generate", {method:"POST", body:fd});
+      const d = await r.json();
+      if (!r.ok || d.error) throw new Error(d.error || "Upload failed");
+      const jobId = d.job_id;
+      genBtn.textContent = "Generating…"; setProgress(2, "Generating…");
+
+      job.poll = setInterval(async () => {
+        try {
+          const sr = await fetch(`/move/status/${jobId}`);
+          const s  = await sr.json();
+          setProgress(s.progress || 0, "Generating…");
+          if (s.status === "done")  { clearInterval(job.poll); job.poll = null; setProgress(100,"Done!"); showResult(jobId); }
+          if (s.status === "error") { clearInterval(job.poll); job.poll = null; errEl.textContent = s.error || "Error"; genBtn.disabled = false; genBtn.textContent = "Generate video"; progBar.style.display = "none"; }
+        } catch { clearInterval(job.poll); job.poll = null; errEl.textContent = "Lost connection."; genBtn.disabled = false; genBtn.textContent = "Generate video"; }
+      }, 500);
+      return true;
+    } catch (e) { errEl.textContent = e.message; genBtn.disabled = false; genBtn.textContent = "Generate video"; progBar.style.display = "none"; return false; }
+  };
+
+  genBtn.addEventListener("click", () => job.run());
+
+  // expose setFile for the connector
+  job.setFile = setFile;
+  return job;
+}
+
+addMoveJobBtn.addEventListener("click", addMoveJob);
+
+moveGenAllBtn.addEventListener("click", async () => {
+  if (!moveJobs.length) return;
+  moveGenAllBtn.disabled = true; moveGenAllBtn.textContent = "Generating…";
+  await Promise.all(moveJobs.map(j => j.run()));
+  moveGenAllBtn.disabled = false; moveGenAllBtn.textContent = "Generate all videos";
+});
+
+
+// ═══════════════════════════════════════════════════
+//  CONNECTOR — nano result → move job
+// ═══════════════════════════════════════════════════
+
+function dataUrlToFile(dataUrl, filename) {
+  const [header, b64] = dataUrl.split(",");
+  const mime  = header.match(/:(.*?);/)[1];
+  const bytes = atob(b64);
+  const arr   = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new File([new Blob([arr], {type: mime})], filename, {type: mime});
+}
+
+function sendToMoveJob(job, dataUrl, filename) {
+  job.setFile(dataUrlToFile(dataUrl, filename));
+}
+
+// Boot
+nanoInit();
+</script>
+</body>
+</html>
