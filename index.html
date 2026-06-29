@@ -805,52 +805,89 @@ function setupMoveJob(card) {
     progLabel.textContent = label;
   }
   function clearResult() {
-    if (job.poll) { clearInterval(job.poll); job.poll = null; }
     progBar.style.display = "none";
     resultDiv.style.display = "none";
     resultVid.src = "";
-  }
-  function showResult(jobId) {
-    progBar.style.display = "none";
-    resultDiv.style.display = "block";
-    resultVid.src = `/move/preview/${jobId}`;
-    dlBtn.href    = `/move/download/${jobId}`;
-    genBtn.disabled = false; genBtn.textContent = "Generate video";
   }
 
   job.run = async function() {
     if (!job.file) { errEl.textContent = "Upload an image first."; return false; }
     errEl.textContent = ""; clearResult();
-    const fd = new FormData();
-    fd.append("image",     job.file);
-    fd.append("duration",  durSlider.value);
-    fd.append("intensity", (parseInt(intSlider.value) / 5.0).toFixed(2));
-    fd.append("speed",     spdSlider.value);
-    fd.append("seed",      seedInput.value);
-    fd.append("fps",       fps);
-    fd.append("direction", direction);
 
-    genBtn.disabled = true; genBtn.textContent = "Uploading…";
-    progBar.style.display = "block"; setProgress(0, "Uploading…");
+    genBtn.disabled = true; genBtn.textContent = "Loading…";
+    progBar.style.display = "block"; setProgress(0, "Loading image…");
 
     try {
-      const r = await fetch("/move/generate", {method:"POST", body:fd});
-      const d = await r.json();
-      if (!r.ok || d.error) throw new Error(d.error || "Upload failed");
-      const jobId = d.job_id;
-      genBtn.textContent = "Generating…"; setProgress(2, "Generating…");
+      // ── Load image ──
+      const img = await loadImage(job.file);
 
-      job.poll = setInterval(async () => {
-        try {
-          const sr = await fetch(`/move/status/${jobId}`);
-          const s  = await sr.json();
-          setProgress(s.progress || 0, "Generating…");
-          if (s.status === "done")  { clearInterval(job.poll); job.poll = null; setProgress(100,"Done!"); showResult(jobId); }
-          if (s.status === "error") { clearInterval(job.poll); job.poll = null; errEl.textContent = s.error || "Error"; genBtn.disabled = false; genBtn.textContent = "Generate video"; progBar.style.display = "none"; }
-        } catch { clearInterval(job.poll); job.poll = null; errEl.textContent = "Lost connection."; genBtn.disabled = false; genBtn.textContent = "Generate video"; }
-      }, 500);
+      // ── Settings ──
+      const duration  = parseInt(durSlider.value);
+      const intensity = parseInt(intSlider.value) / 5.0;
+      const speed     = parseInt(spdSlider.value);
+      const seed      = parseInt(seedInput.value) || 42;
+      const totalFrames = Math.round(duration * fps);
+
+      // ── Canvas: zoom in slightly so shake doesn't reveal edges ──
+      const zoom   = 1 + 0.06 * intensity;
+      const canvas = document.createElement("canvas");
+      canvas.width  = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+
+      // ── Generate shake path ──
+      const path = buildShakePath(totalFrames, intensity, speed, seed, direction, img.width, img.height);
+
+      // ── Record ──
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+        ? "video/webm;codecs=vp9" : "video/webm";
+      const stream   = canvas.captureStream(fps);
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+      const chunks   = [];
+      recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+
+      const donePromise = new Promise(resolve => { recorder.onstop = resolve; });
+      recorder.start();
+      genBtn.textContent = "Generating…";
+
+      // ── Render frame by frame ──
+      const msPerFrame = 1000 / fps;
+      for (let f = 0; f < totalFrames; f++) {
+        const { tx, ty, rot } = path[f];
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(canvas.width / 2 + tx, canvas.height / 2 + ty);
+        ctx.rotate(rot);
+        ctx.scale(zoom, zoom);
+        ctx.drawImage(img, -img.width / 2, -img.height / 2);
+        ctx.restore();
+
+        setProgress(Math.round((f / totalFrames) * 95), "Generating…");
+        await new Promise(r => setTimeout(r, msPerFrame));
+      }
+
+      recorder.stop();
+      await donePromise;
+
+      // ── Build download blob ──
+      const blob    = new Blob(chunks, { type: mimeType });
+      const blobUrl = URL.createObjectURL(blob);
+
+      setProgress(100, "Done!");
+      progBar.style.display = "none";
+      resultDiv.style.display = "block";
+      resultVid.src = blobUrl;
+      dlBtn.href    = blobUrl;
+      dlBtn.setAttribute("download", "handheld.webm");
+      genBtn.disabled = false; genBtn.textContent = "Generate video";
       return true;
-    } catch (e) { errEl.textContent = e.message; genBtn.disabled = false; genBtn.textContent = "Generate video"; progBar.style.display = "none"; return false; }
+
+    } catch (e) {
+      errEl.textContent = e.message;
+      genBtn.disabled = false; genBtn.textContent = "Generate video";
+      progBar.style.display = "none";
+      return false;
+    }
   };
 
   genBtn.addEventListener("click", () => job.run());
@@ -869,6 +906,67 @@ moveGenAllBtn.addEventListener("click", async () => {
   moveGenAllBtn.disabled = false; moveGenAllBtn.textContent = "Generate all videos";
 });
 
+
+// ═══════════════════════════════════════════════════
+//  MOVE — client-side shake helpers
+// ═══════════════════════════════════════════════════
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload  = () => resolve(img);
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// Seeded RNG (mulberry32)
+function makeRng(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = (t + Math.imul(t ^ t >>> 7, 61 | t)) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function buildShakePath(frames, intensity, speed, seed, direction, w, h) {
+  const rng    = makeRng(seed);
+  const maxX   = w * 0.025 * intensity;
+  const maxY   = h * 0.025 * intensity;
+  const maxRot = 0.006 * intensity;
+
+  // Step size scales with speed
+  const stepScale = speed / 5;
+
+  let x = 0, y = 0, r = 0;
+  const raw = [];
+  for (let i = 0; i < frames; i++) {
+    x += (rng() - 0.5) * maxX * 0.5 * stepScale;
+    y += (rng() - 0.5) * maxY * 0.5 * stepScale;
+    r += (rng() - 0.5) * maxRot * 0.5 * stepScale;
+    x  = Math.max(-maxX,   Math.min(maxX,   x));
+    y  = Math.max(-maxY,   Math.min(maxY,   y));
+    r  = Math.max(-maxRot, Math.min(maxRot, r));
+    raw.push({ tx: x, ty: y, rot: r });
+  }
+
+  // Smooth with running average
+  const win = Math.max(1, Math.round(8 / stepScale));
+  const out = [];
+  for (let i = 0; i < frames; i++) {
+    let sx = 0, sy = 0, sr = 0, n = 0;
+    for (let j = Math.max(0, i - win); j <= Math.min(frames - 1, i + win); j++) {
+      sx += raw[j].tx; sy += raw[j].ty; sr += raw[j].rot; n++;
+    }
+    let tx = sx / n, ty = sy / n;
+    if (direction === "horizontal") ty *= 0.15;
+    if (direction === "vertical")   tx *= 0.15;
+    out.push({ tx, ty, rot: sr / n });
+  }
+  return out;
+}
 
 // ═══════════════════════════════════════════════════
 //  CONNECTOR — nano result → move job
