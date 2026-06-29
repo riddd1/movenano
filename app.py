@@ -232,36 +232,42 @@ def _run_move_job(job_id, in_path, out_path, params):
 
 @app.route("/move/generate", methods=["POST"])
 def move_generate():
-    file = request.files.get("image")
-    if not file:
-        return jsonify({"error": "No image uploaded"}), 400
+    try:
+        file = request.files.get("image")
+        if not file:
+            return jsonify({"error": "No image uploaded"}), 400
 
-    params = {
-        "duration":  float(request.form.get("duration",  6)),
-        "intensity": float(request.form.get("intensity", 1.0)),
-        "seed":      int(request.form.get("seed",        42)),
-        "fps":       float(request.form.get("fps",       30)),
-        "direction": request.form.get("direction", "balanced"),
-        "speed":     float(request.form.get("speed",    5)),
-        "crop":      None,
-    }
-    cx, cy = request.form.get("crop_x", type=int), request.form.get("crop_y", type=int)
-    cw, ch = request.form.get("crop_w", type=int), request.form.get("crop_h", type=int)
-    if all(v is not None for v in (cx, cy, cw, ch)):
-        params["crop"] = [cx, cy, cw, ch]
+        params = {
+            "duration":  float(request.form.get("duration",  6)),
+            "intensity": float(request.form.get("intensity", 1.0)),
+            "seed":      int(request.form.get("seed",        42)),
+            "fps":       float(request.form.get("fps",       30)),
+            "direction": request.form.get("direction", "balanced"),
+            "speed":     float(request.form.get("speed",    5)),
+            "crop":      None,
+        }
+        cx, cy = request.form.get("crop_x", type=int), request.form.get("crop_y", type=int)
+        cw, ch = request.form.get("crop_w", type=int), request.form.get("crop_h", type=int)
+        if all(v is not None for v in (cx, cy, cw, ch)):
+            params["crop"] = [cx, cy, cw, ch]
 
-    job_id  = str(uuid.uuid4())
-    tmp_dir = tempfile.mkdtemp(prefix=f"handheld_{job_id[:8]}_")
-    ext     = os.path.splitext(file.filename)[1] or ".png"
-    in_path = os.path.join(tmp_dir, f"input{ext}")
-    out_path = os.path.join(tmp_dir, "output.mp4")
-    file.save(in_path)
+        job_id   = str(uuid.uuid4())
+        tmp_dir  = tempfile.mkdtemp()
+        ext      = os.path.splitext(file.filename or "input.png")[1] or ".png"
+        in_path  = os.path.join(tmp_dir, f"input{ext}")
+        out_path = os.path.join(tmp_dir, "output.mp4")
 
-    with _lock:
-        _jobs[job_id] = {"status": "running", "progress": 0, "output_path": out_path, "error": None}
+        img_bytes = file.read()
+        with open(in_path, "wb") as fh:
+            fh.write(img_bytes)
 
-    threading.Thread(target=_run_move_job, args=(job_id, in_path, out_path, params), daemon=True).start()
-    return jsonify({"job_id": job_id})
+        with _lock:
+            _jobs[job_id] = {"status": "running", "progress": 0, "output_path": out_path, "error": None}
+
+        threading.Thread(target=_run_move_job, args=(job_id, in_path, out_path, params), daemon=True).start()
+        return jsonify({"job_id": job_id})
+    except Exception as exc:
+        return jsonify({"error": f"Upload failed: {exc}"}), 500
 
 
 @app.route("/move/status/<job_id>")
