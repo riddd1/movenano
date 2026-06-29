@@ -10,6 +10,14 @@ import time
 import uuid
 
 from dotenv import load_dotenv, set_key
+
+# Make imageio-ffmpeg's bundled binary available on PATH (works even without system ffmpeg)
+try:
+    import imageio_ffmpeg
+    _ffmpeg_dir = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
+    os.environ["PATH"] = _ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
+except Exception:
+    pass
 from flask import Flask, jsonify, request, send_from_directory, send_file
 
 from google import genai
