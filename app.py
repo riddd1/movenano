@@ -18,8 +18,8 @@ from google.genai import types
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 NANO_DIR   = os.path.join(BASE_DIR, "nano")
 MOVE_DIR   = os.path.join(BASE_DIR, "move")
-ENV_PATH   = os.path.join(NANO_DIR, ".env")
-OUTPUT_DIR = os.path.join(NANO_DIR, "outputs")
+ENV_PATH   = os.path.join(BASE_DIR, ".env")  # root-level .env for Railway compat
+OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
 HANDHELD   = os.path.join(MOVE_DIR, "handheld.py")
 MODEL      = "gemini-2.5-flash-image"
 MAX_SIZE   = 20 * 1024 * 1024
