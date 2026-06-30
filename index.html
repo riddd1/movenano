@@ -234,7 +234,8 @@
 
     <div class="fix-controls-bar">
       <div class="fix-btns">
-        <button id="addJobBtn" class="btn ghost">+ Add image</button>
+        <input type="file" id="addImagesInput" accept="image/*" multiple hidden>
+        <button id="addJobBtn" class="btn ghost">+ Add images</button>
         <button id="nanoGenerateBtn" class="btn primary">Generate all</button>
         <button id="animateAllBtn" class="btn animate-btn hidden">→ Animate all with Move</button>
         <button id="downloadFixZipBtn" class="btn zip-btn hidden">⬇ Download ZIP</button>
@@ -501,7 +502,7 @@ function setupFixJob(card) {
   const removeBtn   = card.querySelector(".fix-remove");
   const errEl       = card.querySelector(".fix-err");
 
-  const job = { card, file:null, busy:false, resultDataUrl:null, resultFilename:null };
+  const job = { card, file:null, busy:false, resultDataUrl:null, resultFilename:null, setFile: null };
 
   function setFile(f) {
     errEl.textContent = "";
@@ -568,10 +569,50 @@ function setupFixJob(card) {
     finally { job.busy=false; spinner.classList.add("hidden"); }
   };
 
+  job.setFile = setFile;
   return job;
 }
 
-addJobBtn.addEventListener("click", addFixJob);
+// Multi-file "Add images" flow
+const addImagesInput = document.getElementById("addImagesInput");
+
+function addFilesAsJobs(files) {
+  for (const f of files) {
+    if (!f.type.startsWith("image/")) continue;
+    const job = addFixJob();
+    job.setFile(f);
+  }
+}
+
+addJobBtn.addEventListener("click", () => addImagesInput.click());
+addImagesInput.addEventListener("change", e => {
+  if (e.target.files.length) addFilesAsJobs(e.target.files);
+  addImagesInput.value = "";
+});
+
+// Global drop zone — drag images anywhere onto the Fix section
+const fixSection = document.getElementById("jobs").closest(".page");
+fixSection.addEventListener("dragover", e => {
+  if ([...e.dataTransfer.items].some(i => i.kind === "file" && i.type.startsWith("image/"))) {
+    e.preventDefault();
+    jobsEl.style.outline = "2px dashed var(--accent)";
+    jobsEl.style.outlineOffset = "4px";
+  }
+});
+fixSection.addEventListener("dragleave", e => {
+  if (!fixSection.contains(e.relatedTarget)) {
+    jobsEl.style.outline = "";
+    jobsEl.style.outlineOffset = "";
+  }
+});
+fixSection.addEventListener("drop", e => {
+  jobsEl.style.outline = "";
+  jobsEl.style.outlineOffset = "";
+  const imgs = [...e.dataTransfer.files].filter(f => f.type.startsWith("image/"));
+  if (!imgs.length) return;
+  e.preventDefault();
+  addFilesAsJobs(imgs);
+});
 
 // Generate all → auto-download ZIP of results
 nanoGenBtn.addEventListener("click", async () => {
