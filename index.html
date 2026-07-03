@@ -149,7 +149,7 @@
     .move-job-head { display:flex; align-items:center; justify-content:space-between; }
     .move-job-title { font-weight:600; font-size:.9rem; color:var(--muted); }
 
-    .move-body { display:grid; grid-template-columns:100px 1fr; gap:12px; align-items:start; }
+    .move-body { display:grid; grid-template-columns:100px minmax(0,1fr); gap:12px; align-items:start; }
 
     .move-drop { position:relative; width:100px; height:100px; border-radius:9px; border:2px dashed var(--border); background:var(--surface2); display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; transition:border-color .15s; font-size:.72rem; color:var(--muted); text-align:center; gap:4px; }
     .move-drop:hover,.move-drop.over { border-color:var(--accent); }
@@ -159,10 +159,10 @@
     .move-thumb-rm { position:absolute; top:3px; right:3px; background:rgba(0,0,0,.65); border:none; color:#fff; border-radius:5px; width:20px; height:20px; cursor:pointer; font-size:.7rem; }
     .move-thumb-rm:hover { background:var(--error); }
 
-    .move-settings { display:flex; flex-direction:column; gap:8px; }
-    .move-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-    .move-field { display:flex; flex-direction:column; gap:4px; }
-    .move-label { font-size:.66rem; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+    .move-settings { display:flex; flex-direction:column; gap:8px; min-width:0; }
+    .move-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; }
+    .move-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+    .move-label { font-size:.66rem; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); overflow-wrap:anywhere; }
     .move-slider-row { display:flex; align-items:center; gap:6px; }
     .move-slider-row input[type=range] { flex:1; accent-color:var(--accent); cursor:pointer; }
     .move-val { font-size:.76rem; font-weight:700; color:var(--accent2); min-width:26px; text-align:right; }
