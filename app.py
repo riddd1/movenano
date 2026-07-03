@@ -217,6 +217,18 @@ def api_concat():
     if not clips:
         return jsonify({"error": "No clips provided."}), 400
 
+    # Optional per-clip trim durations (seconds), same order as `clips`. An empty
+    # string / missing entry / non-positive value means "don't trim this one".
+    raw_durations = request.form.getlist("durations")
+    durations = []
+    for i in range(len(clips)):
+        raw = raw_durations[i] if i < len(raw_durations) else ""
+        try:
+            d = float(raw)
+            durations.append(d if d > 0 else None)
+        except (TypeError, ValueError):
+            durations.append(None)
+
     tmp_dir = tempfile.mkdtemp()
     try:
         in_paths = []
@@ -250,7 +262,9 @@ def api_concat():
         out_path = os.path.join(OUTPUT_DIR, out_filename)
 
         cmd = [FFMPEG_BIN, "-y"]
-        for p in in_paths:
+        for p, dur in zip(in_paths, durations):
+            if dur is not None:
+                cmd += ["-t", str(dur)]  # input-side -t: stop reading this clip after `dur` seconds
             cmd += ["-i", p]
         cmd += [
             "-filter_complex", filter_complex,

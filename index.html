@@ -249,6 +249,7 @@
     .tl-segment { display:flex; align-items:center; gap:10px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; flex-wrap:wrap; }
     .tl-segment-label { font-weight:600; font-size:.85rem; min-width:70px; }
     .tl-segment-time { color:var(--muted); font-size:.8rem; flex:1; }
+    .tl-segment-time em { font-style:normal; color:var(--accent2); }
     .tl-segment .btn { font-size:.76rem; padding:5px 9px; }
 
     .tl-seq { display:flex; flex-direction:column; gap:10px; }
@@ -1196,7 +1197,11 @@ tlRenderBtn.addEventListener("click", async () => {
   tlStatusEl.textContent = "";
   tlResultEl.classList.add("hidden");
   const form = new FormData();
-  ordered.forEach((c,i) => form.append("clips", c.blob, `clip-${i+1}.webm`));
+  ordered.forEach((c,i) => {
+    form.append("clips", c.blob, `clip-${i+1}.webm`);
+    const dur = tlSegmentDurations[i];
+    form.append("durations", dur != null ? dur : "");
+  });
   try {
     const r = await fetch("/api/concat", { method:"POST", body:form });
     const d = await r.json();
@@ -1225,6 +1230,7 @@ const tlSegmentsEl     = document.getElementById("tlSegments");
 
 let tlMarkers = [];
 let tlSegmentPlayEnd = null;
+let tlSegmentDurations = []; // one entry per segment, aligned with clip order at render time
 
 function tlSetRef(file) {
   if (!file || !file.type.startsWith("video/")) return;
@@ -1250,6 +1256,7 @@ tlChangeRefBtn.addEventListener("click", () => {
   tlDrop.classList.remove("hidden");
   tlFileInput.value = "";
   tlMarkers = [];
+  tlSegmentDurations = [];
   tlSegmentsEl.innerHTML = "";
 });
 
@@ -1268,16 +1275,18 @@ tlAddMarkerBtn.addEventListener("click", () => {
 
 function tlRenderSegments() {
   tlSegmentsEl.innerHTML = "";
+  tlSegmentDurations = [];
   if (!tlVideo.duration || !isFinite(tlVideo.duration)) return;
   const bounds = [0, ...tlMarkers, tlVideo.duration];
   for (let i = 0; i < bounds.length - 1; i++) {
     const start = bounds[i], end = bounds[i+1];
     const isLast = i === bounds.length - 2;
+    tlSegmentDurations.push(end - start);
     const row = document.createElement("div");
     row.className = "tl-segment";
     row.innerHTML = `
       <span class="tl-segment-label">Video ${i+1}</span>
-      <span class="tl-segment-time">${tlFormatTime(start)} – ${isLast ? "end" : tlFormatTime(end)}</span>
+      <span class="tl-segment-time">${tlFormatTime(start)} – ${isLast ? "end" : tlFormatTime(end)} <em>(${(end-start).toFixed(1)}s — your clip ${i+1} will be trimmed to this)</em></span>
       <button class="btn ghost tl-seg-play" type="button">▶ Preview</button>
       ${isLast ? "" : '<button class="btn ghost tl-seg-rm" type="button">✕ marker</button>'}
     `;
