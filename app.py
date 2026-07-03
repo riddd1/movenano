@@ -12,13 +12,25 @@ import uuid
 
 from dotenv import load_dotenv, set_key
 
-# Make imageio-ffmpeg's bundled binary available on PATH (works even without system ffmpeg)
+# Resolve a real ffmpeg binary up front instead of hoping "ffmpeg" is on PATH —
+# system ffmpeg isn't guaranteed to exist on every deploy target (e.g. Railway's
+# Railpack builder doesn't honor nixpacks.toml's aptPkgs), so imageio-ffmpeg's
+# bundled/downloaded binary is the reliable fallback. Any failure here is logged
+# instead of silently swallowed, so a bad deploy shows up in the logs immediately.
+FFMPEG_BIN = "ffmpeg"
 try:
     import imageio_ffmpeg
-    _ffmpeg_dir = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
-    os.environ["PATH"] = _ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
-except Exception:
-    pass
+    FFMPEG_BIN = imageio_ffmpeg.get_ffmpeg_exe()
+except Exception as _exc:
+    _which = shutil.which("ffmpeg")
+    if _which:
+        FFMPEG_BIN = _which
+    else:
+        print(f"[startup] Could not resolve an ffmpeg binary via imageio-ffmpeg ({_exc}) "
+              f"and none found on PATH; video features will fail until this is fixed.",
+              file=sys.stderr)
+os.environ["PATH"] = os.path.dirname(FFMPEG_BIN) + os.pathsep + os.environ.get("PATH", "")
+
 from flask import Flask, jsonify, request, send_from_directory, send_file
 
 from google import genai
@@ -192,7 +204,7 @@ def nano_output(filename):
 
 def _probe_video_dims(path):
     """Read WxH from ffmpeg's stderr banner — avoids depending on a separate ffprobe binary."""
-    proc = subprocess.run(["ffmpeg", "-i", path], capture_output=True, text=True, timeout=20)
+    proc = subprocess.run([FFMPEG_BIN, "-i", path], capture_output=True, text=True, timeout=20)
     m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", proc.stderr)
     if not m:
         raise ValueError(f"Could not read video dimensions for {os.path.basename(path)}")
@@ -237,7 +249,7 @@ def api_concat():
         out_filename = f"{uuid.uuid4().hex}.mp4"
         out_path = os.path.join(OUTPUT_DIR, out_filename)
 
-        cmd = ["ffmpeg", "-y"]
+        cmd = [FFMPEG_BIN, "-y"]
         for p in in_paths:
             cmd += ["-i", p]
         cmd += [
