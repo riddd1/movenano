@@ -77,7 +77,17 @@
     .ss-drop-icon { font-size:2rem; margin-bottom:8px; }
     .ss-drop p { font-size:.85rem; color:var(--muted); }
 
-    #ssVideo { width:100%; max-height:480px; border-radius:8px; border:1px solid var(--border); background:#000; display:block; }
+    /* Custom minimal video scrubber (shared by SS + TL players) */
+    .vplayer { display:flex; flex-direction:column; }
+    .vplayer video { width:100%; max-height:480px; border-radius:8px 8px 0 0; background:#000; display:block; cursor:pointer; }
+    .vscrub { display:flex; align-items:center; gap:10px; background:#000; border-radius:0 0 8px 8px; padding:8px 12px; border:1px solid var(--border); border-top:1px solid #222; }
+    .vscrub-play { background:transparent; border:none; color:#fff; font-size:.95rem; cursor:pointer; padding:2px 4px; flex-shrink:0; line-height:1; }
+    .vscrub-range { flex:1; min-width:0; -webkit-appearance:none; appearance:none; height:4px; border-radius:99px; cursor:pointer; background:rgba(255,255,255,.25); }
+    .vscrub-range::-webkit-slider-runnable-track { height:4px; border-radius:99px; background:transparent; }
+    .vscrub-range::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:13px; height:13px; border-radius:50%; background:#fff; cursor:pointer; margin-top:-4.5px; }
+    .vscrub-range::-moz-range-track { height:4px; border-radius:99px; background:transparent; }
+    .vscrub-range::-moz-range-thumb { width:13px; height:13px; border-radius:50%; background:#fff; border:none; cursor:pointer; }
+    .vscrub-time { color:#fff; font-size:.76rem; font-variant-numeric:tabular-nums; flex-shrink:0; white-space:nowrap; }
 
     .ss-controls { display:flex; gap:10px; flex-wrap:wrap; }
     .ss-controls .btn { flex:1; min-width:200px; }
@@ -231,7 +241,7 @@
     .tl-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:14px; margin-bottom:14px; display:flex; flex-direction:column; gap:20px; }
 
     .tl-ref { display:flex; flex-direction:column; gap:10px; }
-    #tlVideo { width:100%; max-height:420px; border-radius:8px; border:1px solid var(--border); background:#000; display:block; }
+    #tlPlayer video { max-height:420px; }
     .tl-marker-controls { display:flex; gap:10px; flex-wrap:wrap; }
     .tl-marker-controls .btn { flex:1; min-width:200px; }
 
@@ -275,8 +285,7 @@
       .fix-btns .btn,.move-btns .btn,.ss-controls .btn,.tl-marker-controls .btn { flex:none; width:100%; min-width:0; }
 
       .ss-drop { min-height:160px; }
-      #ssVideo { max-height:260px; }
-      #tlVideo { max-height:260px; }
+      #ssPlayer video,#tlPlayer video { max-height:260px; }
 
       .move-body { grid-template-columns:80px 1fr; }
       .move-drop,.move-thumb { width:80px; height:80px; }
@@ -323,7 +332,14 @@
         <span class="ss-drop-icon">🎬</span>
         <p>Drop a video or click to upload</p>
       </div>
-      <video id="ssVideo" class="hidden" controls playsinline></video>
+      <div id="ssPlayer" class="vplayer hidden">
+        <video id="ssVideo" playsinline></video>
+        <div class="vscrub">
+          <button class="vscrub-play" type="button">▶</button>
+          <input type="range" class="vscrub-range" min="0" max="1000" value="0" step="1">
+          <span class="vscrub-time">0:00 / 0:00</span>
+        </div>
+      </div>
       <div id="ssControls" class="ss-controls hidden">
         <button id="ssCaptureBtn" class="btn primary" disabled>📸 Capture frame → Fix</button>
         <button id="ssChangeBtn" class="btn ghost">Change video</button>
@@ -388,7 +404,14 @@
           <span class="ss-drop-icon">🎯</span>
           <p>Upload the original video you're recreating, to use as a timing reference (optional)</p>
         </div>
-        <video id="tlVideo" class="hidden" controls playsinline></video>
+        <div id="tlPlayer" class="vplayer hidden">
+          <video id="tlVideo" playsinline></video>
+          <div class="vscrub">
+            <button class="vscrub-play" type="button">▶</button>
+            <input type="range" class="vscrub-range" min="0" max="1000" value="0" step="1">
+            <span class="vscrub-time">0:00 / 0:00</span>
+          </div>
+        </div>
         <div id="tlMarkerControls" class="tl-marker-controls hidden">
           <button id="tlAddMarkerBtn" class="btn ghost">+ Add marker at current time</button>
           <button id="tlChangeRefBtn" class="btn ghost">Change video</button>
@@ -826,6 +849,7 @@ animateAllBtn.addEventListener("click", () => {
 // ═══════════════════════════════════════════════════
 const ssDrop       = document.querySelector(".ss-drop");
 const ssFileInput  = document.getElementById("ssFileInput");
+const ssPlayer     = document.getElementById("ssPlayer");
 const ssVideo      = document.getElementById("ssVideo");
 const ssControls   = document.getElementById("ssControls");
 const ssCaptureBtn = document.getElementById("ssCaptureBtn");
@@ -850,7 +874,7 @@ function ssSetVideo(file) {
   if (!file.type.startsWith("video/")) { ssSetStatus("Please choose a video file."); return; }
   const url = URL.createObjectURL(file);
   ssVideo.src = url;
-  ssVideo.classList.remove("hidden");
+  ssPlayer.classList.remove("hidden");
   ssDrop.classList.add("hidden");
   ssControls.classList.remove("hidden");
   ssCaptureBtn.disabled = true;
@@ -867,11 +891,13 @@ ssDrop.addEventListener("drop", e => ssSetVideo(e.dataTransfer.files[0]));
 ssChangeBtn.addEventListener("click", () => {
   ssVideo.pause();
   ssVideo.removeAttribute("src"); ssVideo.load();
-  ssVideo.classList.add("hidden");
+  ssPlayer.classList.add("hidden");
   ssControls.classList.add("hidden");
   ssDrop.classList.remove("hidden");
   ssFileInput.value = "";
 });
+
+setupScrubber(ssVideo, ssPlayer.querySelector(".vscrub-play"), ssPlayer.querySelector(".vscrub-range"), ssPlayer.querySelector(".vscrub-time"));
 
 ssCaptureBtn.addEventListener("click", () => {
   if (!ssVideo.videoWidth) return;
@@ -1190,6 +1216,7 @@ tlRenderBtn.addEventListener("click", async () => {
 // Reference video + markers
 const tlDrop           = document.getElementById("tlDrop");
 const tlFileInput      = document.getElementById("tlFileInput");
+const tlPlayer         = document.getElementById("tlPlayer");
 const tlVideo          = document.getElementById("tlVideo");
 const tlMarkerControls = document.getElementById("tlMarkerControls");
 const tlAddMarkerBtn   = document.getElementById("tlAddMarkerBtn");
@@ -1203,7 +1230,7 @@ function tlSetRef(file) {
   if (!file || !file.type.startsWith("video/")) return;
   const url = URL.createObjectURL(file);
   tlVideo.src = url;
-  tlVideo.classList.remove("hidden");
+  tlPlayer.classList.remove("hidden");
   tlDrop.classList.add("hidden");
   tlMarkerControls.classList.remove("hidden");
   tlMarkers = [];
@@ -1218,13 +1245,15 @@ tlDrop.addEventListener("drop", e => tlSetRef(e.dataTransfer.files[0]));
 tlChangeRefBtn.addEventListener("click", () => {
   tlVideo.pause();
   tlVideo.removeAttribute("src"); tlVideo.load();
-  tlVideo.classList.add("hidden");
+  tlPlayer.classList.add("hidden");
   tlMarkerControls.classList.add("hidden");
   tlDrop.classList.remove("hidden");
   tlFileInput.value = "";
   tlMarkers = [];
   tlSegmentsEl.innerHTML = "";
 });
+
+setupScrubber(tlVideo, tlPlayer.querySelector(".vscrub-play"), tlPlayer.querySelector(".vscrub-range"), tlPlayer.querySelector(".vscrub-time"));
 
 tlAddMarkerBtn.addEventListener("click", () => {
   if (!tlVideo.duration || !isFinite(tlVideo.duration)) return;
@@ -1278,6 +1307,46 @@ tlVideo.addEventListener("loadedmetadata", () => tlRenderSegments());
 // ═══════════════════════════════════════════════════
 //  SHARED HELPERS
 // ═══════════════════════════════════════════════════
+
+// Minimal custom scrubber: dragging the range bar seeks the video live,
+// frame-by-frame, instead of only jumping once you release it.
+function setupScrubber(video, playBtn, rangeEl, timeEl) {
+  const RANGE_MAX = 1000;
+  let dragging = false;
+
+  function fmt(t) {
+    if (!isFinite(t)) return "0:00";
+    const m = Math.floor(t / 60), s = Math.floor(t % 60);
+    return `${m}:${String(s).padStart(2,"0")}`;
+  }
+  function paintFill(pct) {
+    rangeEl.style.background = `linear-gradient(to right, #fff ${pct}%, rgba(255,255,255,.25) ${pct}%)`;
+  }
+  function syncFromVideo() {
+    if (dragging || !video.duration || !isFinite(video.duration)) return;
+    const pct = (video.currentTime / video.duration) * 100;
+    rangeEl.value = Math.round((video.currentTime / video.duration) * RANGE_MAX);
+    paintFill(pct);
+    timeEl.textContent = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
+  }
+
+  playBtn.addEventListener("click", () => { video.paused ? video.play() : video.pause(); });
+  video.addEventListener("click", () => { video.paused ? video.play() : video.pause(); });
+  video.addEventListener("play",  () => { playBtn.textContent = "⏸"; });
+  video.addEventListener("pause", () => { playBtn.textContent = "▶"; });
+  video.addEventListener("timeupdate", syncFromVideo);
+  video.addEventListener("loadedmetadata", syncFromVideo);
+
+  rangeEl.addEventListener("input", () => {
+    dragging = true;
+    if (!video.duration || !isFinite(video.duration)) return;
+    const t = (rangeEl.value / RANGE_MAX) * video.duration;
+    video.currentTime = t;
+    paintFill((rangeEl.value / RANGE_MAX) * 100);
+    timeEl.textContent = `${fmt(t)} / ${fmt(video.duration)}`;
+  });
+  ["change","pointerup","mouseup","touchend"].forEach(ev => rangeEl.addEventListener(ev, () => { dragging = false; }));
+}
 
 function loadImage(file) {
   return new Promise((resolve,reject)=>{ const img=new Image(); img.onload=()=>resolve(img); img.onerror=reject; img.src=URL.createObjectURL(file); });
