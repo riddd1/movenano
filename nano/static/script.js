@@ -15,6 +15,19 @@ Change ONLY:
 
 Soft natural window daylight, muted true-to-life colors, gentle realistic contact shadows under fabric edges. Visible fabric texture, natural wrinkles, fold lines and seams. Casual handheld iPhone snapshot, slightly soft not tack-sharp, faint sensor grain, warm indoor auto white balance. Avoid: oversaturated colors, HDR glow, harsh studio lighting, 3D render, CGI, plastic look. The output must contain zero text and zero icons.`,
 
+  bgkeep: `Remove any text, captions, play buttons, social media icons, phone status bar elements (battery icon, signal bars, wifi icon, clock/time, carrier name, notch, dynamic island), and any other UI overlay from the image. Fill those areas with what would naturally be behind them.
+
+Recreate this exact photo as a direct reference. Keep ALL clothing items the exact same color, style, and type. Keep all brand logos on clothing and shoes. Keep the same camera angle and overall composition.
+
+Change ONLY:
+- The background surface — if it is a bedsheet change to a different style and color bedsheet, if it is a floor change to a different floor type and color, if it is a table change to a different table surface
+
+Keep ALL accessories (jewelry, watches, hair clips, sunglasses, scrunchies, bags, belts) EXACTLY the same — same items, same colors, same styles, same positions. Do NOT replace or alter any accessory.
+
+Remove any loose items in the scene that are NOT accessories — beauty products, bottles, packaging, cables, remotes, clutter, or any other random objects. Fill those areas naturally with the new background surface.
+
+Soft natural window daylight, muted true-to-life colors, gentle realistic contact shadows under fabric edges. Visible fabric texture, natural wrinkles, fold lines and seams. Casual handheld iPhone snapshot, slightly soft not tack-sharp, faint sensor grain, warm indoor auto white balance. Avoid: oversaturated colors, HDR glow, harsh studio lighting, 3D render, CGI, plastic look. The output must contain zero text and zero icons.`,
+
   color: `Remove any text, captions, play buttons, social media icons, phone status bar elements (battery icon, signal bars, wifi icon, clock/time, carrier name, notch, dynamic island), and any other UI overlay from the image. Fill those areas with what would naturally be behind them.
 
 Recreate this exact photo as a direct reference. Keep the EXACT same background, surface, camera angle, composition, and layout. Do NOT change the background at all. Keep all brand logos on clothing and shoes.
