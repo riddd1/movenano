@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fix + Move</title>
+  <title>SS + Fix + Move</title>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -56,6 +56,39 @@
     .btn.big-wide { width:100%; padding:14px; font-size:1rem; margin-top:12px; }
     .hidden { display:none !important; }
     .error-text { color:var(--error); font-size:.85rem; margin-top:8px; min-height:1.2em; }
+
+    /* ─────────────────────────────────────
+       SS — video frame grabber
+    ───────────────────────────────────── */
+    .ss-card {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--r); padding:14px; margin-bottom:14px;
+      display:flex; flex-direction:column; gap:12px;
+    }
+    .ss-drop {
+      position:relative; min-height:220px; border-radius:8px;
+      border:2px dashed var(--border); background:var(--surface2);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      text-align:center; cursor:pointer; overflow:hidden;
+      transition:border-color .15s, background .15s;
+    }
+    .ss-drop:hover,.ss-drop.dragover { border-color:var(--accent); background:rgba(124,58,237,.07); }
+    .ss-drop input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+    .ss-drop-icon { font-size:2rem; margin-bottom:8px; }
+    .ss-drop p { font-size:.85rem; color:var(--muted); }
+
+    #ssVideo { width:100%; max-height:480px; border-radius:8px; border:1px solid var(--border); background:#000; display:block; }
+
+    .ss-controls { display:flex; gap:10px; flex-wrap:wrap; }
+    .ss-controls .btn { flex:1; min-width:200px; }
+    .ss-controls .btn:disabled { opacity:.4; cursor:not-allowed; }
+
+    .ss-status { color:var(--accent2); font-size:.82rem; min-height:1.2em; }
+
+    .ss-thumbs { display:flex; flex-wrap:wrap; gap:10px; }
+    .ss-thumb { position:relative; width:84px; height:84px; border-radius:8px; overflow:hidden; border:1px solid var(--border); flex-shrink:0; }
+    .ss-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .ss-thumb-time { position:absolute; bottom:2px; right:3px; background:rgba(0,0,0,.7); color:#fff; font-size:.6rem; padding:1px 4px; border-radius:4px; }
 
     /* ─────────────────────────────────────
        FIX — image grid
@@ -206,8 +239,11 @@
       #moveJobs { grid-template-columns:1fr; }
 
       .fix-controls-bar,.move-controls-bar { padding:14px; }
-      .fix-btns,.move-btns { flex-direction:column; }
-      .fix-btns .btn,.move-btns .btn { flex:none; width:100%; min-width:0; }
+      .fix-btns,.move-btns,.ss-controls { flex-direction:column; }
+      .fix-btns .btn,.move-btns .btn,.ss-controls .btn { flex:none; width:100%; min-width:0; }
+
+      .ss-drop { min-height:160px; }
+      #ssVideo { max-height:260px; }
 
       .move-body { grid-template-columns:80px 1fr; }
       .move-drop,.move-thumb { width:80px; height:80px; }
@@ -238,9 +274,32 @@
   <div class="page">
 
     <header>
-      <h1>Fix + Move</h1>
-      <p>Transform images · animate with handheld camera motion</p>
+      <h1>SS + Fix + Move</h1>
+      <p>Grab stills from video · transform images · animate with handheld camera motion</p>
     </header>
+
+    <!-- ── SS ── -->
+    <div class="section-head">
+      <h2>SS</h2>
+      <span class="pill">grab stills from video</span>
+    </div>
+
+    <div class="ss-card">
+      <div class="ss-drop">
+        <input type="file" id="ssFileInput" accept="video/*" hidden>
+        <span class="ss-drop-icon">🎬</span>
+        <p>Drop a video or click to upload</p>
+      </div>
+      <video id="ssVideo" class="hidden" controls playsinline></video>
+      <div id="ssControls" class="ss-controls hidden">
+        <button id="ssCaptureBtn" class="btn primary" disabled>📸 Capture frame → Fix</button>
+        <button id="ssChangeBtn" class="btn ghost">Change video</button>
+      </div>
+      <p id="ssStatus" class="ss-status"></p>
+      <div id="ssThumbs" class="ss-thumbs"></div>
+    </div>
+
+    <div class="divider">send stills to fix</div>
 
     <!-- ── FIX ── -->
     <div class="section-head">
@@ -689,6 +748,81 @@ animateAllBtn.addEventListener("click", () => {
     mj.setFile(dataUrlToFile(fj.resultDataUrl, fj.resultFilename || "result.png"));
   }
   document.getElementById("moveJobs").scrollIntoView({ behavior:"smooth", block:"start" });
+});
+
+// ═══════════════════════════════════════════════════
+//  SS — grab still frames from a video, send to Fix
+// ═══════════════════════════════════════════════════
+const ssDrop       = document.querySelector(".ss-drop");
+const ssFileInput  = document.getElementById("ssFileInput");
+const ssVideo      = document.getElementById("ssVideo");
+const ssControls   = document.getElementById("ssControls");
+const ssCaptureBtn = document.getElementById("ssCaptureBtn");
+const ssChangeBtn  = document.getElementById("ssChangeBtn");
+const ssStatusEl   = document.getElementById("ssStatus");
+const ssThumbsEl   = document.getElementById("ssThumbs");
+
+let ssStatusTimer = null;
+function ssSetStatus(msg) {
+  ssStatusEl.textContent = msg;
+  clearTimeout(ssStatusTimer);
+  ssStatusTimer = setTimeout(() => { ssStatusEl.textContent = ""; }, 3000);
+}
+
+function ssFormatTime(t) {
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  return `${m}:${String(s).padStart(2,"0")}`;
+}
+
+function ssSetVideo(file) {
+  if (!file) return;
+  if (!file.type.startsWith("video/")) { ssSetStatus("Please choose a video file."); return; }
+  const url = URL.createObjectURL(file);
+  ssVideo.src = url;
+  ssVideo.classList.remove("hidden");
+  ssDrop.classList.add("hidden");
+  ssControls.classList.remove("hidden");
+  ssCaptureBtn.disabled = true;
+}
+
+ssVideo.addEventListener("loadedmetadata", () => { ssCaptureBtn.disabled = false; });
+
+ssDrop.addEventListener("click", () => ssFileInput.click());
+ssFileInput.addEventListener("change", e => ssSetVideo(e.target.files[0]));
+["dragenter","dragover"].forEach(ev => ssDrop.addEventListener(ev, e => { e.preventDefault(); ssDrop.classList.add("dragover"); }));
+["dragleave","drop"].forEach(ev => ssDrop.addEventListener(ev, e => { e.preventDefault(); ssDrop.classList.remove("dragover"); }));
+ssDrop.addEventListener("drop", e => ssSetVideo(e.dataTransfer.files[0]));
+
+ssChangeBtn.addEventListener("click", () => {
+  ssVideo.pause();
+  ssVideo.removeAttribute("src"); ssVideo.load();
+  ssVideo.classList.add("hidden");
+  ssControls.classList.add("hidden");
+  ssDrop.classList.remove("hidden");
+  ssFileInput.value = "";
+});
+
+ssCaptureBtn.addEventListener("click", () => {
+  if (!ssVideo.videoWidth) return;
+  const t = ssVideo.currentTime;
+  const canvas = document.createElement("canvas");
+  canvas.width  = ssVideo.videoWidth;
+  canvas.height = ssVideo.videoHeight;
+  canvas.getContext("2d").drawImage(ssVideo, 0, 0, canvas.width, canvas.height);
+  canvas.toBlob(blob => {
+    if (!blob) { ssSetStatus("Capture failed — try again."); return; }
+    const filename = `frame-${Math.round(t*1000)}.png`;
+    const file = new File([blob], filename, { type:"image/png" });
+
+    const thumb = document.createElement("div");
+    thumb.className = "ss-thumb";
+    thumb.innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="frame at ${ssFormatTime(t)}"><span class="ss-thumb-time">${ssFormatTime(t)}</span>`;
+    ssThumbsEl.appendChild(thumb);
+
+    const job = addFixJob();
+    job.setFile(file);
+    ssSetStatus(`Captured frame at ${ssFormatTime(t)} → added to Fix ✓`);
+  }, "image/png");
 });
 
 // ═══════════════════════════════════════════════════
