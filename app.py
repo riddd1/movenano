@@ -2,6 +2,7 @@ import base64
 import os
 import random
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -29,9 +30,10 @@ MOVE_DIR   = os.path.join(BASE_DIR, "move")
 ENV_PATH   = os.path.join(BASE_DIR, ".env")  # root-level .env for Railway compat
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
 HANDHELD   = os.path.join(MOVE_DIR, "handheld.py")
-MODEL      = "gemini-2.5-flash-image"
-MAX_SIZE   = 20 * 1024 * 1024
-MAX_TRIES  = 4
+MODEL       = "gemini-2.5-flash-image"
+MAX_SIZE    = 500 * 1024 * 1024  # generous cap so TL can upload several video clips at once
+MAX_TRIES   = 4
+CONCAT_TIMEOUT = 300
 
 RETRYABLE = (
     "500","502","503","429","internal","pipeline","unavailable","overloaded",
@@ -92,7 +94,7 @@ def get_key():
 
 @app.errorhandler(413)
 def too_large(_e):
-    return jsonify({"error": "Image too large. Max 20MB."}), 413
+    return jsonify({"error": "Upload too large."}), 413
 
 
 @app.route("/")
@@ -184,6 +186,77 @@ def api_generate():
 @app.route("/outputs/<path:filename>")
 def nano_output(filename):
     return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
+
+
+# ── TL routes ─────────────────────────────────────────────────
+
+def _probe_video_dims(path):
+    """Read WxH from ffmpeg's stderr banner — avoids depending on a separate ffprobe binary."""
+    proc = subprocess.run(["ffmpeg", "-i", path], capture_output=True, text=True, timeout=20)
+    m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", proc.stderr)
+    if not m:
+        raise ValueError(f"Could not read video dimensions for {os.path.basename(path)}")
+    return int(m.group(1)), int(m.group(2))
+
+
+@app.route("/api/concat", methods=["POST"])
+def api_concat():
+    clips = request.files.getlist("clips")
+    if not clips:
+        return jsonify({"error": "No clips provided."}), 400
+
+    tmp_dir = tempfile.mkdtemp()
+    try:
+        in_paths = []
+        for i, f in enumerate(clips):
+            ext = os.path.splitext(f.filename or "clip.webm")[1] or ".webm"
+            p = os.path.join(tmp_dir, f"clip{i:03d}{ext}")
+            f.save(p)
+            in_paths.append(p)
+
+        try:
+            dims = [_probe_video_dims(p) for p in in_paths]
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        target_w = max(w for w, _ in dims)
+        target_h = max(h for _, h in dims)
+        target_w += target_w % 2
+        target_h += target_h % 2
+
+        filter_parts = []
+        concat_inputs = ""
+        for i in range(len(in_paths)):
+            filter_parts.append(
+                f"[{i}:v]scale=w={target_w}:h={target_h}:force_original_aspect_ratio=decrease,"
+                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=30[v{i}]"
+            )
+            concat_inputs += f"[v{i}]"
+        filter_complex = ";".join(filter_parts) + f";{concat_inputs}concat=n={len(in_paths)}:v=1:a=0[outv]"
+
+        out_filename = f"{uuid.uuid4().hex}.mp4"
+        out_path = os.path.join(OUTPUT_DIR, out_filename)
+
+        cmd = ["ffmpeg", "-y"]
+        for p in in_paths:
+            cmd += ["-i", p]
+        cmd += [
+            "-filter_complex", filter_complex,
+            "-map", "[outv]",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+            out_path,
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=CONCAT_TIMEOUT)
+        if proc.returncode != 0:
+            return jsonify({"error": f"Render failed: {proc.stderr[-800:]}"}), 500
+
+        return jsonify({"download_url": f"/outputs/{out_filename}", "filename": out_filename})
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "Render timed out."}), 504
+    except Exception as exc:
+        return jsonify({"error": f"Render failed: {exc}"}), 500
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 # ── Move routes ───────────────────────────────────────────────

@@ -225,6 +225,38 @@
     .move-btns { display:flex; gap:10px; flex-wrap:wrap; }
     .move-btns .btn { flex:1; min-width:160px; }
 
+    /* ─────────────────────────────────────
+       TL — sequence Move clips, render final cut
+    ───────────────────────────────────── */
+    .tl-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:14px; margin-bottom:14px; display:flex; flex-direction:column; gap:20px; }
+
+    .tl-ref { display:flex; flex-direction:column; gap:10px; }
+    #tlVideo { width:100%; max-height:420px; border-radius:8px; border:1px solid var(--border); background:#000; display:block; }
+    .tl-marker-controls { display:flex; gap:10px; flex-wrap:wrap; }
+    .tl-marker-controls .btn { flex:1; min-width:200px; }
+
+    .tl-segments { display:flex; flex-direction:column; gap:6px; }
+    .tl-segment { display:flex; align-items:center; gap:10px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; flex-wrap:wrap; }
+    .tl-segment-label { font-weight:600; font-size:.85rem; min-width:70px; }
+    .tl-segment-time { color:var(--muted); font-size:.8rem; flex:1; }
+    .tl-segment .btn { font-size:.76rem; padding:5px 9px; }
+
+    .tl-seq { display:flex; flex-direction:column; gap:10px; }
+    .tl-seq-hint { color:var(--muted); font-size:.82rem; }
+    .tl-tray { display:flex; flex-wrap:wrap; align-items:center; gap:10px; min-height:96px; padding:10px; background:var(--surface2); border:1px dashed var(--border); border-radius:8px; }
+    .tl-empty-hint { color:var(--muted); font-size:.8rem; }
+
+    .tl-clip { position:relative; width:96px; height:96px; border-radius:8px; overflow:hidden; border:2px solid var(--border); cursor:pointer; flex-shrink:0; transition:border-color .15s; }
+    .tl-clip:hover { border-color:var(--accent2); }
+    .tl-clip.selected { border-color:var(--accent); }
+    .tl-clip video { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+    .tl-clip-badge { position:absolute; top:4px; left:4px; background:var(--accent); color:#fff; font-size:.72rem; font-weight:700; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+    .tl-clip-rm { position:absolute; top:3px; right:3px; background:rgba(0,0,0,.65); border:none; color:#fff; border-radius:5px; width:20px; height:20px; cursor:pointer; font-size:.7rem; }
+    .tl-clip-rm:hover { background:var(--error); }
+
+    .tl-result { display:flex; flex-direction:column; gap:8px; }
+    .tl-result video { width:100%; max-height:300px; border-radius:8px; border:1px solid var(--border); background:#000; }
+
     hr { border:none; border-top:1px solid var(--border); }
 
     @media(max-width:640px) {
@@ -239,11 +271,12 @@
       #moveJobs { grid-template-columns:1fr; }
 
       .fix-controls-bar,.move-controls-bar { padding:14px; }
-      .fix-btns,.move-btns,.ss-controls { flex-direction:column; }
-      .fix-btns .btn,.move-btns .btn,.ss-controls .btn { flex:none; width:100%; min-width:0; }
+      .fix-btns,.move-btns,.ss-controls,.tl-marker-controls { flex-direction:column; }
+      .fix-btns .btn,.move-btns .btn,.ss-controls .btn,.tl-marker-controls .btn { flex:none; width:100%; min-width:0; }
 
       .ss-drop { min-height:160px; }
       #ssVideo { max-height:260px; }
+      #tlVideo { max-height:260px; }
 
       .move-body { grid-template-columns:80px 1fr; }
       .move-drop,.move-thumb { width:80px; height:80px; }
@@ -338,6 +371,43 @@
         <button id="downloadMoveZipBtn" class="btn zip-btn hidden">⬇ Download ZIP</button>
       </div>
       <p id="moveGlobalError" class="error-text"></p>
+    </div>
+
+    <div class="divider">arrange into a final cut</div>
+
+    <!-- ── TL ── -->
+    <div class="section-head">
+      <h2>TL</h2>
+      <span class="pill">sequence &amp; render</span>
+    </div>
+
+    <div class="tl-card">
+      <div class="tl-ref">
+        <div class="ss-drop" id="tlDrop">
+          <input type="file" id="tlFileInput" accept="video/*" hidden>
+          <span class="ss-drop-icon">🎯</span>
+          <p>Upload the original video you're recreating, to use as a timing reference (optional)</p>
+        </div>
+        <video id="tlVideo" class="hidden" controls playsinline></video>
+        <div id="tlMarkerControls" class="tl-marker-controls hidden">
+          <button id="tlAddMarkerBtn" class="btn ghost">+ Add marker at current time</button>
+          <button id="tlChangeRefBtn" class="btn ghost">Change video</button>
+        </div>
+        <div id="tlSegments" class="tl-segments"></div>
+      </div>
+
+      <div class="tl-seq">
+        <p class="tl-seq-hint">Click clips below in the order you want them in the final video — first click = 1, and so on.</p>
+        <div id="tlTray" class="tl-tray">
+          <p class="tl-empty-hint">Videos you send here from Move will show up as clips to sequence.</p>
+        </div>
+        <button id="tlRenderBtn" class="btn primary big-wide" disabled>Render final video</button>
+        <p id="tlStatus" class="ss-status"></p>
+        <div id="tlResult" class="tl-result hidden">
+          <video controls playsinline></video>
+          <a class="btn success-btn" download="final-cut.mp4">⬇ Download final video</a>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -441,6 +511,7 @@
         <video controls autoplay loop muted playsinline></video>
         <div class="move-result-actions">
           <a class="btn success-btn move-dl" download="handheld.webm">⬇ Download</a>
+          <button class="btn animate-btn move-send-tl" type="button">→ Send to TL</button>
         </div>
       </div>
       <p class="move-err"></p>
@@ -865,6 +936,7 @@ function setupMoveJob(card) {
   const resultDiv = card.querySelector(".move-result");
   const resultVid = card.querySelector(".move-result video");
   const dlBtn     = card.querySelector(".move-dl");
+  const sendTlBtn = card.querySelector(".move-send-tl");
   const errEl     = card.querySelector(".move-err");
 
   const durSlider = card.querySelector(".dur-slider");
@@ -933,6 +1005,18 @@ function setupMoveJob(card) {
   removeBtn.addEventListener("click", () => {
     const i=moveJobs.indexOf(job); if(i!==-1) moveJobs.splice(i,1);
     card.remove(); moveRenumber();
+  });
+
+  sendTlBtn.addEventListener("click", async () => {
+    if (!job.resultBlobUrl) return;
+    sendTlBtn.disabled = true; sendTlBtn.textContent = "Sending…";
+    try {
+      const blob = await fetch(job.resultBlobUrl).then(r => r.blob());
+      tlAddClip(blob);
+      document.getElementById("tlTray").scrollIntoView({ behavior:"smooth", block:"center" });
+    } finally {
+      sendTlBtn.disabled = false; sendTlBtn.textContent = "→ Send to TL";
+    }
   });
 
   function setProgress(pct,label) { progFill.style.width=pct+"%"; progPct.textContent=pct+"%"; progLabel.textContent=label; }
@@ -1013,6 +1097,183 @@ async function downloadMoveZip() {
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a"); a.href=url; a.download="move-videos.zip"; a.click();
 }
+
+// ═══════════════════════════════════════════════════
+//  TL — sequence Move clips + reference timeline, render final cut
+// ═══════════════════════════════════════════════════
+const tlTrayEl    = document.getElementById("tlTray");
+const tlRenderBtn = document.getElementById("tlRenderBtn");
+const tlStatusEl  = document.getElementById("tlStatus");
+const tlResultEl  = document.getElementById("tlResult");
+const tlResultVid = tlResultEl.querySelector("video");
+const tlResultDl  = tlResultEl.querySelector("a");
+
+const tlClips = []; // { id, blob, url, order:null|number, el }
+let tlClipSeq = 0;
+
+function tlFormatTime(t) {
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  return `${m}:${String(s).padStart(2,"0")}`;
+}
+
+function tlEmptyHintUpdate() {
+  const hint = tlTrayEl.querySelector(".tl-empty-hint");
+  if (hint) hint.classList.toggle("hidden", tlClips.length > 0);
+}
+
+function tlRenumber() {
+  const ordered = tlClips.filter(c => c.order !== null).sort((a,b) => a.order - b.order);
+  ordered.forEach((c,i) => { c.order = i + 1; });
+  tlClips.forEach(c => {
+    const badge = c.el.querySelector(".tl-clip-badge");
+    if (c.order !== null) { badge.textContent = c.order; badge.classList.remove("hidden"); c.el.classList.add("selected"); }
+    else { badge.textContent = ""; badge.classList.add("hidden"); c.el.classList.remove("selected"); }
+  });
+  tlRenderBtn.disabled = ordered.length === 0;
+}
+
+function tlAddClip(blob) {
+  const id  = ++tlClipSeq;
+  const url = URL.createObjectURL(blob);
+  const el  = document.createElement("div");
+  el.className = "tl-clip";
+  el.innerHTML = `
+    <span class="tl-clip-badge hidden"></span>
+    <video src="${url}" muted autoplay loop playsinline></video>
+    <button class="tl-clip-rm" type="button" title="Remove from TL">✕</button>
+  `;
+  const clip = { id, blob, url, order: null, el };
+
+  el.addEventListener("click", e => {
+    if (e.target.closest(".tl-clip-rm")) return;
+    if (clip.order !== null) { clip.order = null; }
+    else { clip.order = Math.max(0, ...tlClips.map(c => c.order || 0)) + 1; }
+    tlRenumber();
+  });
+  el.querySelector(".tl-clip-rm").addEventListener("click", () => {
+    const i = tlClips.indexOf(clip);
+    if (i !== -1) tlClips.splice(i, 1);
+    el.remove();
+    tlRenumber();
+    tlEmptyHintUpdate();
+  });
+
+  tlClips.push(clip);
+  tlTrayEl.appendChild(el);
+  tlEmptyHintUpdate();
+}
+
+tlRenderBtn.addEventListener("click", async () => {
+  const ordered = tlClips.filter(c => c.order !== null).sort((a,b) => a.order - b.order);
+  if (!ordered.length) return;
+  tlRenderBtn.disabled = true; tlRenderBtn.textContent = "Rendering…";
+  tlStatusEl.textContent = "";
+  tlResultEl.classList.add("hidden");
+  const form = new FormData();
+  ordered.forEach((c,i) => form.append("clips", c.blob, `clip-${i+1}.webm`));
+  try {
+    const r = await fetch("/api/concat", { method:"POST", body:form });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Render failed.");
+    tlResultVid.src = d.download_url;
+    tlResultDl.href = d.download_url;
+    tlResultDl.setAttribute("download", d.filename || "final-cut.mp4");
+    tlResultEl.classList.remove("hidden");
+    tlStatusEl.textContent = "Final video ready ✓";
+  } catch(e) {
+    tlStatusEl.textContent = e.message;
+  } finally {
+    tlRenderBtn.disabled = false; tlRenderBtn.textContent = "Render final video";
+  }
+});
+
+// Reference video + markers
+const tlDrop           = document.getElementById("tlDrop");
+const tlFileInput      = document.getElementById("tlFileInput");
+const tlVideo          = document.getElementById("tlVideo");
+const tlMarkerControls = document.getElementById("tlMarkerControls");
+const tlAddMarkerBtn   = document.getElementById("tlAddMarkerBtn");
+const tlChangeRefBtn   = document.getElementById("tlChangeRefBtn");
+const tlSegmentsEl     = document.getElementById("tlSegments");
+
+let tlMarkers = [];
+let tlSegmentPlayEnd = null;
+
+function tlSetRef(file) {
+  if (!file || !file.type.startsWith("video/")) return;
+  const url = URL.createObjectURL(file);
+  tlVideo.src = url;
+  tlVideo.classList.remove("hidden");
+  tlDrop.classList.add("hidden");
+  tlMarkerControls.classList.remove("hidden");
+  tlMarkers = [];
+}
+
+tlDrop.addEventListener("click", () => tlFileInput.click());
+tlFileInput.addEventListener("change", e => tlSetRef(e.target.files[0]));
+["dragenter","dragover"].forEach(ev => tlDrop.addEventListener(ev, e => { e.preventDefault(); tlDrop.classList.add("dragover"); }));
+["dragleave","drop"].forEach(ev => tlDrop.addEventListener(ev, e => { e.preventDefault(); tlDrop.classList.remove("dragover"); }));
+tlDrop.addEventListener("drop", e => tlSetRef(e.dataTransfer.files[0]));
+
+tlChangeRefBtn.addEventListener("click", () => {
+  tlVideo.pause();
+  tlVideo.removeAttribute("src"); tlVideo.load();
+  tlVideo.classList.add("hidden");
+  tlMarkerControls.classList.add("hidden");
+  tlDrop.classList.remove("hidden");
+  tlFileInput.value = "";
+  tlMarkers = [];
+  tlSegmentsEl.innerHTML = "";
+});
+
+tlAddMarkerBtn.addEventListener("click", () => {
+  if (!tlVideo.duration || !isFinite(tlVideo.duration)) return;
+  const t = tlVideo.currentTime;
+  if (t <= 0.05 || t >= tlVideo.duration - 0.05) return;
+  if (!tlMarkers.some(m => Math.abs(m - t) < 0.05)) {
+    tlMarkers.push(t);
+    tlMarkers.sort((a,b) => a - b);
+    tlRenderSegments();
+  }
+});
+
+function tlRenderSegments() {
+  tlSegmentsEl.innerHTML = "";
+  if (!tlVideo.duration || !isFinite(tlVideo.duration)) return;
+  const bounds = [0, ...tlMarkers, tlVideo.duration];
+  for (let i = 0; i < bounds.length - 1; i++) {
+    const start = bounds[i], end = bounds[i+1];
+    const isLast = i === bounds.length - 2;
+    const row = document.createElement("div");
+    row.className = "tl-segment";
+    row.innerHTML = `
+      <span class="tl-segment-label">Video ${i+1}</span>
+      <span class="tl-segment-time">${tlFormatTime(start)} – ${isLast ? "end" : tlFormatTime(end)}</span>
+      <button class="btn ghost tl-seg-play" type="button">▶ Preview</button>
+      ${isLast ? "" : '<button class="btn ghost tl-seg-rm" type="button">✕ marker</button>'}
+    `;
+    row.querySelector(".tl-seg-play").addEventListener("click", () => {
+      tlVideo.currentTime = start;
+      tlSegmentPlayEnd = end;
+      tlVideo.play();
+    });
+    if (!isLast) {
+      row.querySelector(".tl-seg-rm").addEventListener("click", () => {
+        tlMarkers.splice(i, 1);
+        tlRenderSegments();
+      });
+    }
+    tlSegmentsEl.appendChild(row);
+  }
+}
+
+tlVideo.addEventListener("timeupdate", () => {
+  if (tlSegmentPlayEnd !== null && tlVideo.currentTime >= tlSegmentPlayEnd) {
+    tlVideo.pause();
+    tlSegmentPlayEnd = null;
+  }
+});
+tlVideo.addEventListener("loadedmetadata", () => tlRenderSegments());
 
 // ═══════════════════════════════════════════════════
 //  SHARED HELPERS

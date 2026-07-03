@@ -1,6 +1,8 @@
 nano/venv/
 nano/outputs/
 nano/.env
+outputs/
+.env
 *.DS_Store
 __pycache__/
 *.pyc
