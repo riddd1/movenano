@@ -152,8 +152,19 @@ def api_generate():
     if not mime.startswith("image/"):
         return jsonify({"error": "Not a valid image file."}), 400
 
+    contents = [types.Part.from_bytes(data=img_bytes, mime_type=mime)]
+
+    img2_file = request.files.get("image2")
+    if img2_file and img2_file.filename:
+        img2_bytes = img2_file.read()
+        mime2      = img2_file.mimetype or "image/png"
+        if not mime2.startswith("image/"):
+            return jsonify({"error": "Not a valid image file for image 2."}), 400
+        contents.append(types.Part.from_bytes(data=img2_bytes, mime_type=mime2))
+
+    contents.append(prompt)
+
     client   = genai.Client(api_key=key)
-    contents = [types.Part.from_bytes(data=img_bytes, mime_type=mime), prompt]
     config   = types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"])
 
     img_part   = None

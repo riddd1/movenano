@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -142,6 +143,10 @@
       width:100%; height:180px; object-fit:cover;
       border-radius:8px; border:1px solid var(--border);
     }
+
+    .fix-slot-label { font-size:.7rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+    .fix-slot { display:flex; flex-direction:column; gap:6px; }
+    .fix-drop.fix-drop-sm,.fix-source-img.fix-source-sm { height:120px; }
 
     .fix-result-area {
       position:relative; height:180px; border-radius:8px;
@@ -445,14 +450,26 @@
       <button class="fix-remove" type="button">✕</button>
     </div>
     <div class="fix-img-area">
-      <!-- Drop zone (shown before image) -->
-      <div class="fix-drop">
-        <input type="file" class="fix-file-input" accept="image/*" hidden>
-        <span class="fix-drop-icon">⬆</span>
-        <p>Drop image or click</p>
+      <div class="fix-slot">
+        <span class="fix-slot-label">Image 1 — reference (layout to copy)</span>
+        <!-- Drop zone (shown before image) -->
+        <div class="fix-drop">
+          <input type="file" class="fix-file-input" accept="image/*" hidden>
+          <span class="fix-drop-icon">⬆</span>
+          <p>Drop image or click</p>
+        </div>
+        <!-- Source preview (shown after image picked) -->
+        <img class="fix-source-img hidden" alt="reference source">
       </div>
-      <!-- Source preview (shown after image picked) -->
-      <img class="fix-source-img hidden" alt="source">
+      <div class="fix-slot">
+        <span class="fix-slot-label">Image 2 — your item (goes into the layout)</span>
+        <div class="fix-drop fix-drop-sm fix-drop2">
+          <input type="file" class="fix-file-input2" accept="image/*" hidden>
+          <span class="fix-drop-icon">⬆</span>
+          <p>Drop image or click</p>
+        </div>
+        <img class="fix-source-img fix-source-sm hidden fix-source-img2" alt="item source">
+      </div>
       <!-- Result area (shown after generate) -->
       <div class="fix-result-area hidden">
         <div class="fix-spinner hidden"></div>
@@ -462,10 +479,7 @@
     </div>
     <select class="fix-preset">
       <option value="">✏️ Custom prompt…</option>
-      <option value="bg">Background Swap</option>
-      <option value="bgkeep">Background Swap (Keep Accessories)</option>
-      <option value="color">Color Swap</option>
-      <option value="remix">Full Remix</option>
+      <option value="swap" selected>Swap in my item</option>
     </select>
     <textarea class="fix-prompt" rows="2" placeholder="Pick a preset or describe your own transformation…"></textarea>
     <div class="fix-result-actions hidden">
@@ -549,53 +563,15 @@
 //  PRESETS
 // ═══════════════════════════════════════════════════
 const PRESETS = {
-  bg: `Remove any text, captions, play buttons, social media icons, phone status bar elements (battery icon, signal bars, wifi icon, clock/time, carrier name, notch, dynamic island), and any other UI overlay from the image. Fill those areas with what would naturally be behind them.
+  swap: `You are given two images. Image 1 is the reference layout. Image 2 is my actual item.
 
-Recreate this exact photo as a direct reference. Keep ALL clothing items the exact same color, style, and type. Keep all brand logos on clothing and shoes. Keep the same camera angle and overall composition.
+Recreate Image 1 exactly as a direct reference — same background, surface, lighting, camera angle, composition, and overall photo quality.
 
-Change ONLY:
-- The background surface — if it is a bedsheet change to a different style and color bedsheet, if it is a floor change to a different floor type and color, if it is a table change to a different table surface
-- Slightly reposition any small items like scrunchies, beauty products, sunglasses, or accessories so the layout feels fresh but still natural
-- Replace any accessories (jewelry, watches, hair clips, beauty products) with different alternatives that match and complement the outfit's color palette
+Replace the matching clothing item(s) in Image 1 with the exact item from Image 2 — same color, pattern, material, print, and design, placed in the same position, angle, fold, and drape that the original item had in Image 1. Do not alter the item from Image 2 in any way; reproduce it exactly as shown.
 
-Soft natural window daylight, muted true-to-life colors, gentle realistic contact shadows under fabric edges. Visible fabric texture, natural wrinkles, fold lines and seams. Casual handheld iPhone snapshot, slightly soft not tack-sharp, faint sensor grain, warm indoor auto white balance. Avoid: oversaturated colors, HDR glow, harsh studio lighting, 3D render, CGI, plastic look. The output must contain zero text and zero icons.`,
+If Image 2 only provides a replacement for some of the items/accessories shown in Image 1, keep the rest of Image 1 unchanged. If Image 1 contains extra accessories or items that have no matching replacement in Image 2, remove those unmatched extras from the scene entirely and fill the space naturally — do not invent or guess a replacement for them.
 
-  bgkeep: `Remove any text, captions, play buttons, social media icons, phone status bar elements (battery icon, signal bars, wifi icon, clock/time, carrier name, notch, dynamic island), and any other UI overlay from the image. Fill those areas with what would naturally be behind them.
-
-Recreate this exact photo as a direct reference. Keep ALL clothing items the exact same color, style, and type. Keep all brand logos on clothing and shoes. Keep the same camera angle and overall composition.
-
-Change ONLY:
-- The background surface — if it is a bedsheet change to a different style and color bedsheet, if it is a floor change to a different floor type and color, if it is a table change to a different table surface
-
-Keep ALL accessories (jewelry, watches, hair clips, sunglasses, scrunchies, bags, belts) EXACTLY the same — same items, same colors, same styles, same positions. Do NOT replace or alter any accessory.
-
-Remove any loose items in the scene that are NOT accessories — beauty products, bottles, packaging, cables, remotes, clutter, or any other random objects. Fill those areas naturally with the new background surface.
-
-Soft natural window daylight, muted true-to-life colors, gentle realistic contact shadows under fabric edges. Visible fabric texture, natural wrinkles, fold lines and seams. Casual handheld iPhone snapshot, slightly soft not tack-sharp, faint sensor grain, warm indoor auto white balance. Avoid: oversaturated colors, HDR glow, harsh studio lighting, 3D render, CGI, plastic look. The output must contain zero text and zero icons.`,
-
-  color: `Remove any text, captions, play buttons, social media icons, phone status bar elements (battery icon, signal bars, wifi icon, clock/time, carrier name, notch, dynamic island), and any other UI overlay from the image. Fill those areas with what would naturally be behind them.
-
-Recreate this exact photo as a direct reference. Keep the EXACT same background, surface, camera angle, composition, and layout. Do NOT change the background at all. Keep all brand logos on clothing and shoes.
-
-Change ONLY:
-- Change the color of the clothing items to a different attractive color that is NOT the current color — pick a color that coordinates well across all visible garments so the outfit still looks intentional and stylish together
-- Replace any accessories (jewelry, watches, hair clips, beauty products) with different alternatives that match and complement the NEW clothing color
-- Keep all clothing styles, types, fits, folds, and positions identical — only the color changes
-
-Soft natural window daylight, muted true-to-life colors, gentle realistic contact shadows under fabric edges. Visible fabric texture, natural wrinkles, fold lines and seams. Casual handheld iPhone snapshot, slightly soft not tack-sharp, faint sensor grain, warm indoor auto white balance. Avoid: oversaturated colors, HDR glow, harsh studio lighting, 3D render, CGI, plastic look. The output must contain zero text and zero icons.`,
-
-  remix: `Remove any text, captions, play buttons, social media icons, phone status bar elements (battery icon, signal bars, wifi icon, clock/time, carrier name, notch, dynamic island), and any other UI overlay from the image. Fill those areas with what would naturally be behind them.
-
-Recreate this exact photo as a direct reference. Keep the same camera angle and overall composition. Keep all brand logos on clothing and shoes.
-
-Change ALL of these:
-- The background surface — if it is a bedsheet change to a different style and color bedsheet, if it is a floor change to a different floor type and color, if it is a table change to a different table surface
-- Change the color of the clothing items to a different attractive color that is NOT the current color — pick a color that coordinates well across all visible garments so the outfit still looks intentional and stylish together
-- Slightly reposition any small items like scrunchies, beauty products, sunglasses, or accessories so the layout feels fresh but still natural
-- Replace any accessories (jewelry, watches, hair clips, beauty products) with different alternatives that match and complement the NEW clothing color and NEW background
-- Keep all clothing styles, types, fits, folds, and positions identical — only the colors change
-
-Soft natural window daylight, muted true-to-life colors, gentle realistic contact shadows under fabric edges. Visible fabric texture, natural wrinkles, fold lines and seams. Casual handheld iPhone snapshot, slightly soft not tack-sharp, faint sensor grain, warm indoor auto white balance. Avoid: oversaturated colors, HDR glow, harsh studio lighting, 3D render, CGI, plastic look. The output must contain zero text and zero icons.`,
+Keep everything else identical to Image 1: background, surface, remaining accessories, lighting, shadows, fabric texture, and image quality. Remove any text, captions, play buttons, social media icons, or phone UI overlays. The output must contain zero text and zero icons.`,
 };
 
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -676,6 +652,9 @@ function setupFixJob(card) {
   const dropEl      = card.querySelector(".fix-drop");
   const fileInput   = card.querySelector(".fix-file-input");
   const sourceImg   = card.querySelector(".fix-source-img");
+  const dropEl2      = card.querySelector(".fix-drop2");
+  const fileInput2   = card.querySelector(".fix-file-input2");
+  const sourceImg2   = card.querySelector(".fix-source-img2");
   const resultArea  = card.querySelector(".fix-result-area");
   const spinner     = card.querySelector(".fix-spinner");
   const placeholder = card.querySelector(".fix-result-placeholder");
@@ -688,7 +667,7 @@ function setupFixJob(card) {
   const removeBtn   = card.querySelector(".fix-remove");
   const errEl       = card.querySelector(".fix-err");
 
-  const job = { card, file:null, busy:false, resultDataUrl:null, resultFilename:null, setFile: null };
+  const job = { card, file:null, file2:null, busy:false, resultDataUrl:null, resultFilename:null, setFile: null, setFile2: null };
 
   function setFile(f) {
     errEl.textContent = "";
@@ -702,11 +681,29 @@ function setupFixJob(card) {
     dropEl.classList.add("hidden");
   }
 
+  function setFile2(f) {
+    errEl.textContent = "";
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { errEl.textContent = "Please choose an image file."; return; }
+    if (f.size > MAX_BYTES) { errEl.textContent = "Image too large. Max 20MB."; return; }
+    job.file2 = f;
+    const url = URL.createObjectURL(f);
+    sourceImg2.src = url;
+    sourceImg2.classList.remove("hidden");
+    dropEl2.classList.add("hidden");
+  }
+
   dropEl.addEventListener("click", () => fileInput.click());
   fileInput.addEventListener("change", e => setFile(e.target.files[0]));
   ["dragenter","dragover"].forEach(ev => dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.add("dragover"); }));
   ["dragleave","drop"].forEach(ev => dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.remove("dragover"); }));
   dropEl.addEventListener("drop", e => setFile(e.dataTransfer.files[0]));
+
+  dropEl2.addEventListener("click", () => fileInput2.click());
+  fileInput2.addEventListener("change", e => setFile2(e.target.files[0]));
+  ["dragenter","dragover"].forEach(ev => dropEl2.addEventListener(ev, e => { e.preventDefault(); dropEl2.classList.add("dragover"); }));
+  ["dragleave","drop"].forEach(ev => dropEl2.addEventListener(ev, e => { e.preventDefault(); dropEl2.classList.remove("dragover"); }));
+  dropEl2.addEventListener("drop", e => setFile2(e.dataTransfer.files[0]));
 
   presetSel.addEventListener("change", () => { const p=PRESETS[presetSel.value]; if(p) promptEl.value=p; });
   promptEl.addEventListener("input", () => { if(presetSel.value && promptEl.value!==PRESETS[presetSel.value]) presetSel.value=""; });
@@ -727,7 +724,8 @@ function setupFixJob(card) {
 
   job.run = async function() {
     errEl.textContent = "";
-    if (!job.file)                { errEl.textContent = "Upload an image first."; return false; }
+    if (!job.file)                { errEl.textContent = "Upload a reference image (Image 1) first."; return false; }
+    if (!job.file2)               { errEl.textContent = "Upload your item image (Image 2) first."; return false; }
     if (!promptEl.value.trim())   { errEl.textContent = "Enter a prompt first.";  return false; }
     job.busy = true;
     resultArea.classList.remove("hidden");
@@ -738,6 +736,7 @@ function setupFixJob(card) {
 
     const form = new FormData();
     form.append("image",  job.file);
+    form.append("image2", job.file2);
     form.append("prompt", promptEl.value.trim());
     try {
       const r = await fetch("/api/generate", { method:"POST", body:form });
@@ -755,7 +754,8 @@ function setupFixJob(card) {
     finally { job.busy=false; spinner.classList.add("hidden"); }
   };
 
-  job.setFile = setFile;
+  job.setFile  = setFile;
+  job.setFile2 = setFile2;
   return job;
 }
 
