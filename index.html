@@ -707,6 +707,7 @@ function setupFixJob(card) {
 
   presetSel.addEventListener("change", () => { const p=PRESETS[presetSel.value]; if(p) promptEl.value=p; });
   promptEl.addEventListener("input", () => { if(presetSel.value && promptEl.value!==PRESETS[presetSel.value]) presetSel.value=""; });
+  if (presetSel.value && PRESETS[presetSel.value]) promptEl.value = PRESETS[presetSel.value];
 
   removeBtn.addEventListener("click", () => {
     const i = fixJobs.indexOf(job);
