@@ -574,7 +574,9 @@ This is a full replacement, not a blend or overlay. Completely erase the origina
 
 Every other item, garment, and accessory in Image 1 that does NOT have a matching category in Image 2 must be kept completely unchanged — same item, same color, same position. Do NOT remove, hide, or replace anything in Image 1 that Image 2 doesn't provide a same-category replacement for. If Image 2 only shows one item (e.g. only trousers), that means only that one item changes and everything else in Image 1 stays exactly as it is.
 
-Keep everything else identical to Image 1: background, surface, untouched items, lighting, shadows, fabric texture, and image quality. Remove any text, captions, play buttons, social media icons, or phone UI overlays. The output must contain zero text and zero icons.`,
+Image 2 may be a screenshot or video frame with its own background, bedsheet, caption text, titles, play button, profile icons, or other social-media UI laid over or around the item — completely IGNORE all of that. Only extract the clean garment itself (its true color, pattern, fabric, and shape) from Image 2. None of Image 2's background, surface, text, or UI should appear anywhere in the output. The output's canvas, aspect ratio, framing, and crop must match Image 1 exactly — do not adopt Image 2's framing or orientation.
+
+Keep everything else identical to Image 1: background, surface, untouched items, lighting, shadows, fabric texture, and image quality. Remove any text, captions, play buttons, social media icons, or phone UI overlays from both source images. The output must contain zero text and zero icons.`,
 };
 
 const MAX_BYTES = 20 * 1024 * 1024;
