@@ -564,15 +564,7 @@
 //  PRESETS
 // ═══════════════════════════════════════════════════
 const PRESETS = {
-  swap: `You are given two images. Image 1 is the reference layout. Image 2 is my actual item.
-
-Remove any text, captions, titles, play buttons, profile icons, and Instagram/TikTok UI or layout from both images — ignore all of that, it is not part of the clothing.
-
-Take the equivalent piece of clothing shown in Image 2 and replace the matching item in Image 1 with it — same type/category (e.g. trousers→trousers, jacket→jacket, shoes→shoes). Reproduce the item from Image 2 exactly as it looks: same color, pattern, material, and design. Make it look like it was meant to be in Image 1 — natural position, angle, fold, drape, and contact shadows matching Image 1's lighting and camera angle, with zero ghosting or trace of the original item left behind. Replace it fully.
-
-Every other item, garment, and accessory in Image 1 that Image 2 doesn't provide a replacement for must stay completely unchanged — same item, same color, same position. If Image 2 only shows one item, only that one item changes in Image 1; everything else stays exactly as it is.
-
-Keep Image 1's background, surface, lighting, camera angle, composition, and overall photo quality identical. The output's canvas, aspect ratio, and framing must match Image 1, not Image 2. The output must contain zero text and zero icons.`,
+  swap: `Remove the text and the Instagram layout. I want you to make the equivalent piece of clothing in Image 2 and replace it with Image 1 and make it look like it was meant to be in Image 1, replace it.`,
 };
 
 const MAX_BYTES = 20 * 1024 * 1024;
