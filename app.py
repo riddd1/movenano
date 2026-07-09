@@ -1,16 +1,11 @@
-import base64
 import os
-import random
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import threading
-import time
 import uuid
-
-from dotenv import load_dotenv, set_key
 
 # Resolve a real ffmpeg binary up front instead of hoping "ffmpeg" is on PATH —
 # system ffmpeg isn't guaranteed to exist on every deploy target (e.g. Railway's
@@ -33,75 +28,20 @@ os.environ["PATH"] = os.path.dirname(FFMPEG_BIN) + os.pathsep + os.environ.get("
 
 from flask import Flask, jsonify, request, send_from_directory, send_file
 
-from google import genai
-from google.genai import types
-
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
-NANO_DIR   = os.path.join(BASE_DIR, "nano")
 MOVE_DIR   = os.path.join(BASE_DIR, "move")
-ENV_PATH   = os.path.join(BASE_DIR, ".env")  # root-level .env for Railway compat
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
 HANDHELD   = os.path.join(MOVE_DIR, "handheld.py")
-MODEL       = "gemini-2.5-flash-image"
 MAX_SIZE    = 500 * 1024 * 1024  # generous cap so TL can upload several video clips at once
-MAX_TRIES   = 4
 CONCAT_TIMEOUT = 300
 
-RETRYABLE = (
-    "500","502","503","429","internal","pipeline","unavailable","overloaded",
-    "deadline","timeout","try again","resource exhausted","rate","broken pipe",
-    "errno 32","connection reset","connection aborted","connection error",
-    "connection refused","remote end closed","eof occurred","ssl","read timed out",
-    "protocolerror","socket","nodename nor servname","name or service not known",
-    "errno 8","temporary failure in name resolution","getaddrinfo","name resolution",
-    "failed to resolve","errno -2","errno -3","max retries",
-)
-
-def is_retryable(msg):
-    m = (msg or "").lower()
-    return any(h in m for h in RETRYABLE)
-
-def backoff(attempt):
-    return min(8.0, 0.6 * (2 ** attempt)) + random.uniform(0, 0.4)
-
-def extract_image(response):
-    try:
-        for part in response.candidates[0].content.parts:
-            inline = getattr(part, "inline_data", None)
-            if inline and inline.mime_type and inline.mime_type.startswith("image/"):
-                return inline
-    except (AttributeError, IndexError, TypeError):
-        pass
-    return None
-
-def no_image_reason(response):
-    try:
-        cand = response.candidates[0]
-        finish = str(getattr(cand, "finish_reason", "") or "")
-        if "SAFETY" in finish.upper() or "BLOCK" in finish.upper():
-            return "Request blocked by safety filters."
-        for part in cand.content.parts:
-            txt = getattr(part, "text", None)
-            if txt:
-                return f"Model returned text instead of an image: {txt.strip()[:200]}"
-    except (AttributeError, IndexError, TypeError):
-        pass
-    return "Model did not return an image. Try again."
-
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-if not os.path.exists(ENV_PATH):
-    open(ENV_PATH, "a").close()
-load_dotenv(ENV_PATH)  # local .env; Railway env vars take precedence automatically
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_SIZE
 
 _jobs: dict = {}
 _lock = threading.Lock()
-
-
-def get_key():
-    return os.environ.get("GOOGLE_API_KEY", "").strip()
 
 
 @app.errorhandler(413)
@@ -114,106 +54,8 @@ def index():
     return send_file(os.path.join(BASE_DIR, "index.html"))
 
 
-# ── Nano routes ──────────────────────────────────────────────
-
-@app.route("/api/status")
-def api_status():
-    return jsonify({"configured": bool(get_key())})
-
-
-@app.route("/api/save-key", methods=["POST"])
-def api_save_key():
-    data = request.get_json(silent=True) or {}
-    key  = (data.get("api_key") or "").strip()
-    if not key:
-        return jsonify({"error": "Please enter a valid API key."}), 400
-    try:
-        set_key(ENV_PATH, "GOOGLE_API_KEY", key)
-        os.environ["GOOGLE_API_KEY"] = key
-    except Exception as exc:
-        return jsonify({"error": f"Could not save key: {exc}"}), 500
-    return jsonify({"configured": True})
-
-
-@app.route("/api/generate", methods=["POST"])
-def api_generate():
-    key = get_key()
-    if not key:
-        return jsonify({"error": "No API key. Add your Gemini API key first."}), 400
-    if "image" not in request.files or not request.files["image"].filename:
-        return jsonify({"error": "Please upload an image."}), 400
-    prompt = (request.form.get("prompt") or "").strip()
-    if not prompt:
-        return jsonify({"error": "Please enter a prompt."}), 400
-
-    img_file  = request.files["image"]
-    img_bytes = img_file.read()
-    mime      = img_file.mimetype or "image/png"
-    if not mime.startswith("image/"):
-        return jsonify({"error": "Not a valid image file."}), 400
-
-    img2_file = request.files.get("image2")
-    if img2_file and img2_file.filename:
-        img2_bytes = img2_file.read()
-        mime2      = img2_file.mimetype or "image/png"
-        if not mime2.startswith("image/"):
-            return jsonify({"error": "Not a valid image file for image 2."}), 400
-        # Interleave a label immediately before each image so the model can't
-        # confuse which image is the reference layout vs. the item to insert.
-        contents = [
-            "Image 1 (the reference layout to copy):",
-            types.Part.from_bytes(data=img_bytes, mime_type=mime),
-            "Image 2 (my actual item to insert into Image 1):",
-            types.Part.from_bytes(data=img2_bytes, mime_type=mime2),
-            prompt,
-        ]
-    else:
-        contents = [types.Part.from_bytes(data=img_bytes, mime_type=mime), prompt]
-
-    client   = genai.Client(api_key=key)
-    config   = types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"])
-
-    img_part   = None
-    last_error = "Model did not return an image."
-    for attempt in range(MAX_TRIES):
-        try:
-            resp = client.models.generate_content(model=MODEL, contents=contents, config=config)
-        except Exception as exc:
-            last_error = f"Gemini API error: {exc}"
-            if is_retryable(str(exc)) and attempt < MAX_TRIES - 1:
-                time.sleep(backoff(attempt))
-                continue
-            return jsonify({"error": last_error}), 502
-
-        img_part = extract_image(resp)
-        if img_part:
-            break
-        last_error = no_image_reason(resp)
-        if "safety" in last_error or "text instead" in last_error:
-            return jsonify({"error": last_error}), 502
-        if attempt < MAX_TRIES - 1:
-            time.sleep(backoff(attempt))
-
-    if not img_part:
-        return jsonify({"error": last_error}), 502
-
-    out_mime = img_part.mime_type
-    ext      = re.sub(r"[^a-zA-Z0-9]", "", (out_mime.split("/")[-1] or "png").split(";")[0]) or "png"
-    filename = f"{uuid.uuid4().hex}.{ext}"
-    out_path = os.path.join(OUTPUT_DIR, filename)
-    with open(out_path, "wb") as fh:
-        fh.write(img_part.data)
-
-    b64 = base64.b64encode(img_part.data).decode("ascii")
-    return jsonify({
-        "image":        f"data:{out_mime};base64,{b64}",
-        "download_url": f"/outputs/{filename}",
-        "filename":     filename,
-    })
-
-
 @app.route("/outputs/<path:filename>")
-def nano_output(filename):
+def outputs(filename):
     return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
 
 

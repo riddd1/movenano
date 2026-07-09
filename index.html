@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SS + Fix + Move</title>
+  <title>Move</title>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -16,15 +16,6 @@
     }
     body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; min-height:100vh; }
 
-    /* ── Overlay ── */
-    .overlay { position:fixed; inset:0; background:rgba(8,9,12,.93); display:flex; align-items:center; justify-content:center; padding:20px; z-index:50; }
-    .overlay.hidden { display:none; }
-    .setup-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:32px; max-width:440px; width:100%; }
-    .setup-card h2 { margin-bottom:10px; font-size:1.3rem; }
-    .setup-card p  { color:var(--muted); font-size:.9rem; line-height:1.6; margin-bottom:16px; }
-    .setup-card input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px; color:var(--text); padding:12px 14px; font-size:1rem; margin-bottom:12px; }
-    .setup-card input:focus { outline:none; border-color:var(--accent); }
-    .hint { font-size:.82rem !important; color:var(--muted) !important; margin-top:12px !important; }
     a { color:var(--accent2); }
 
     /* ── Page ── */
@@ -59,13 +50,8 @@
     .error-text { color:var(--error); font-size:.85rem; margin-top:8px; min-height:1.2em; }
 
     /* ─────────────────────────────────────
-       SS — video frame grabber
+       Shared drop-zone (used by TL's reference-video upload)
     ───────────────────────────────────── */
-    .ss-card {
-      background:var(--surface); border:1px solid var(--border);
-      border-radius:var(--r); padding:14px; margin-bottom:14px;
-      display:flex; flex-direction:column; gap:12px;
-    }
     .ss-drop {
       position:relative; min-height:220px; border-radius:8px;
       border:2px dashed var(--border); background:var(--surface2);
@@ -90,98 +76,7 @@
     .vscrub-range::-moz-range-thumb { width:13px; height:13px; border-radius:50%; background:#fff; border:none; cursor:pointer; }
     .vscrub-time { color:#fff; font-size:.76rem; font-variant-numeric:tabular-nums; flex-shrink:0; white-space:nowrap; }
 
-    .ss-controls { display:flex; gap:10px; flex-wrap:wrap; }
-    .ss-controls .btn { flex:1; min-width:200px; }
-    .ss-controls .btn:disabled { opacity:.4; cursor:not-allowed; }
-
     .ss-status { color:var(--accent2); font-size:.82rem; min-height:1.2em; }
-
-    .ss-thumbs { display:flex; flex-wrap:wrap; gap:10px; }
-    .ss-thumb { position:relative; width:84px; height:84px; border-radius:8px; overflow:hidden; border:1px solid var(--border); flex-shrink:0; }
-    .ss-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
-    .ss-thumb-time { position:absolute; bottom:2px; right:3px; background:rgba(0,0,0,.7); color:#fff; font-size:.6rem; padding:1px 4px; border-radius:4px; }
-
-    /* ─────────────────────────────────────
-       FIX — image grid
-    ───────────────────────────────────── */
-    #jobs {
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
-      gap:14px;
-      margin-bottom:14px;
-    }
-
-    .fix-card {
-      background:var(--surface); border:1px solid var(--border);
-      border-radius:var(--r); padding:14px;
-      display:flex; flex-direction:column; gap:10px;
-    }
-    .fix-card-head { display:flex; align-items:center; justify-content:space-between; }
-    .fix-num { font-weight:600; font-size:.9rem; color:var(--muted); }
-    .fix-remove {
-      background:transparent; border:1px solid var(--border); color:var(--muted);
-      width:26px; height:26px; border-radius:7px; cursor:pointer; font-size:.8rem;
-    }
-    .fix-remove:hover { color:var(--error); border-color:var(--error); }
-
-    /* Image area — stacked: source on top, result below */
-    .fix-img-area { display:flex; flex-direction:column; gap:8px; }
-
-    .fix-drop {
-      position:relative; height:180px; border-radius:8px;
-      border:2px dashed var(--border); background:var(--surface2);
-      display:flex; flex-direction:column; align-items:center; justify-content:center;
-      text-align:center; cursor:pointer; overflow:hidden;
-      transition:border-color .15s, background .15s;
-    }
-    .fix-drop:hover,.fix-drop.dragover { border-color:var(--accent); background:rgba(124,58,237,.07); }
-    .fix-drop input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
-    .fix-drop-icon { font-size:1.6rem; margin-bottom:6px; }
-    .fix-drop p { font-size:.8rem; color:var(--muted); }
-
-    .fix-source-img {
-      width:100%; height:180px; object-fit:cover;
-      border-radius:8px; border:1px solid var(--border);
-    }
-
-    .fix-slot-label { font-size:.7rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
-    .fix-slot { display:flex; flex-direction:column; gap:6px; }
-    .fix-drop.fix-drop-sm,.fix-source-img.fix-source-sm { height:120px; }
-
-    .fix-result-area {
-      position:relative; height:180px; border-radius:8px;
-      border:1px solid var(--border); overflow:hidden;
-      background:var(--surface2); display:flex; align-items:center; justify-content:center;
-    }
-    .fix-result-img { width:100%; height:100%; object-fit:cover; }
-    .fix-result-placeholder { color:var(--muted); font-size:.8rem; }
-
-    .fix-spinner {
-      position:absolute; width:36px; height:36px;
-      border:3px solid var(--border); border-top-color:var(--accent);
-      border-radius:50%; animation:spin .8s linear infinite;
-    }
-    @keyframes spin { to { transform:rotate(360deg); } }
-
-    /* Prompt area */
-    .fix-preset { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); padding:8px 10px; font-size:1rem; font-family:inherit; cursor:pointer; }
-    .fix-preset:focus { outline:none; border-color:var(--accent); }
-    .fix-prompt { width:100%; resize:vertical; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); padding:9px 11px; font-size:1rem; font-family:inherit; }
-    .fix-prompt:focus { outline:none; border-color:var(--accent); }
-    .fix-err { color:var(--error); font-size:.8rem; min-height:1em; }
-
-    .fix-result-actions { display:flex; gap:6px; }
-    .fix-result-actions .btn { flex:1; font-size:.8rem; padding:7px 10px; }
-
-    /* Fix controls bar */
-    .fix-controls-bar {
-      background:var(--surface); border:1px solid var(--border);
-      border-radius:var(--r); padding:18px; margin-top:4px;
-    }
-    .fix-btns { display:flex; gap:10px; flex-wrap:wrap; }
-    .fix-btns .btn { flex:1; min-width:140px; }
-    .cost-meter { color:var(--muted); font-size:.82rem; margin-top:10px; text-align:center; }
-    .cost-meter span { color:var(--accent2); font-weight:600; }
 
     /* ─────────────────────────────────────
        MOVE — multi-job compact cards
@@ -283,15 +178,14 @@
       .section-head { flex-wrap:wrap; row-gap:8px; }
       .divider { margin:26px 0; }
 
-      #jobs { grid-template-columns:1fr; }
       #moveJobs { grid-template-columns:1fr; }
 
-      .fix-controls-bar,.move-controls-bar { padding:14px; }
-      .fix-btns,.move-btns,.ss-controls,.tl-marker-controls { flex-direction:column; }
-      .fix-btns .btn,.move-btns .btn,.ss-controls .btn,.tl-marker-controls .btn { flex:none; width:100%; min-width:0; }
+      .move-controls-bar { padding:14px; }
+      .move-btns,.tl-marker-controls { flex-direction:column; }
+      .move-btns .btn,.tl-marker-controls .btn { flex:none; width:100%; min-width:0; }
 
       .ss-drop { min-height:160px; }
-      #ssPlayer video,#tlPlayer video { max-height:260px; }
+      #tlPlayer video { max-height:260px; }
 
       .move-body { grid-template-columns:80px 1fr; }
       .move-drop,.move-thumb { width:80px; height:80px; }
@@ -306,77 +200,13 @@
 </head>
 <body>
 
-<!-- API key overlay -->
-<div id="setup" class="overlay hidden">
-  <div class="setup-card">
-    <h2>Welcome to Fix + Move</h2>
-    <p>Fix uses Google Gemini to transform your images. Enter your API key once — it's saved locally.</p>
-    <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API key" autocomplete="off" />
-    <button id="saveKeyBtn" class="btn primary wide">Save &amp; Continue</button>
-    <p id="setupError" class="error-text"></p>
-    <p class="hint">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. Move works without a key.</p>
-  </div>
-</div>
-
-<div id="app" class="hidden">
+<div id="app">
   <div class="page">
 
     <header>
-      <h1>SS + Fix + Move</h1>
-      <p>Grab stills from video · transform images · animate with handheld camera motion</p>
+      <h1>Move</h1>
+      <p>Animate images with handheld camera motion</p>
     </header>
-
-    <!-- ── SS ── -->
-    <div class="section-head">
-      <h2>SS</h2>
-      <span class="pill">grab stills from video</span>
-    </div>
-
-    <div class="ss-card">
-      <div class="ss-drop">
-        <input type="file" id="ssFileInput" accept="video/*" hidden>
-        <span class="ss-drop-icon">🎬</span>
-        <p>Drop a video or click to upload</p>
-      </div>
-      <div id="ssPlayer" class="vplayer hidden">
-        <video id="ssVideo" playsinline></video>
-        <div class="vscrub">
-          <button class="vscrub-play" type="button">▶</button>
-          <input type="range" class="vscrub-range" min="0" max="1000" value="0" step="1">
-          <span class="vscrub-time">0:00 / 0:00</span>
-        </div>
-      </div>
-      <div id="ssControls" class="ss-controls hidden">
-        <button id="ssCaptureBtn" class="btn primary" disabled>📸 Capture frame → Fix</button>
-        <button id="ssChangeBtn" class="btn ghost">Change video</button>
-      </div>
-      <p id="ssStatus" class="ss-status"></p>
-      <div id="ssThumbs" class="ss-thumbs"></div>
-    </div>
-
-    <div class="divider">send stills to fix</div>
-
-    <!-- ── FIX ── -->
-    <div class="section-head">
-      <h2>Fix</h2>
-      <span class="pill">AI image editing</span>
-    </div>
-
-    <div id="jobs"></div>
-
-    <div class="fix-controls-bar">
-      <div class="fix-btns">
-        <input type="file" id="addImagesInput" accept="image/*" multiple hidden>
-        <button id="addJobBtn" class="btn ghost">+ Add images</button>
-        <button id="nanoGenerateBtn" class="btn primary">Generate all</button>
-        <button id="animateAllBtn" class="btn animate-btn hidden">→ Animate all with Move</button>
-        <button id="downloadFixZipBtn" class="btn zip-btn hidden">⬇ Download ZIP</button>
-      </div>
-      <p class="cost-meter">~$0.04 per generation · <span id="genCount">0</span> this session · ~$<span id="costTotal">0.00</span></p>
-      <p id="nanoError" class="error-text"></p>
-    </div>
-
-    <div class="divider">animate with move</div>
 
     <!-- ── MOVE ── -->
     <div class="section-head">
@@ -442,55 +272,6 @@
   </div>
 </div>
 
-<!-- Fix card template -->
-<template id="fixCardTemplate">
-  <div class="fix-card">
-    <div class="fix-card-head">
-      <span class="fix-num">1</span>
-      <button class="fix-remove" type="button">✕</button>
-    </div>
-    <div class="fix-img-area">
-      <div class="fix-slot">
-        <span class="fix-slot-label">Image 1 — reference (layout to copy)</span>
-        <!-- Drop zone (shown before image) -->
-        <div class="fix-drop">
-          <input type="file" class="fix-file-input" accept="image/*" hidden>
-          <span class="fix-drop-icon">⬆</span>
-          <p>Drop image or click</p>
-        </div>
-        <!-- Source preview (shown after image picked) -->
-        <img class="fix-source-img hidden" alt="reference source">
-      </div>
-      <div class="fix-slot">
-        <span class="fix-slot-label">Image 2 — your item (goes into the layout)</span>
-        <div class="fix-drop fix-drop-sm fix-drop2">
-          <input type="file" class="fix-file-input2" accept="image/*" hidden>
-          <span class="fix-drop-icon">⬆</span>
-          <p>Drop image or click</p>
-        </div>
-        <img class="fix-source-img fix-source-sm hidden fix-source-img2" alt="item source">
-      </div>
-      <!-- Result area (shown after generate) -->
-      <div class="fix-result-area hidden">
-        <div class="fix-spinner hidden"></div>
-        <div class="fix-result-placeholder">Result appears here.</div>
-        <img class="fix-result-img hidden" alt="result">
-      </div>
-    </div>
-    <select class="fix-preset">
-      <option value="">✏️ Custom prompt…</option>
-      <option value="swap" selected>Swap in my item</option>
-    </select>
-    <textarea class="fix-prompt" rows="2" placeholder="Pick a preset or describe your own transformation…"></textarea>
-    <div class="fix-result-actions hidden">
-      <a class="btn primary fix-dl hidden" download style="font-size:.8rem;padding:7px 10px">Download</a>
-      <button class="btn fix-regen hidden" style="font-size:.8rem;padding:7px 10px">↻ Regenerate</button>
-      <button class="btn animate-btn fix-animate hidden" style="font-size:.8rem;padding:7px 10px">→ Animate</button>
-    </div>
-    <p class="fix-err"></p>
-  </div>
-</template>
-
 <!-- Move job template -->
 <template id="moveJobTemplate">
   <div class="move-job">
@@ -500,9 +281,9 @@
     </div>
     <div class="move-body">
       <div class="move-drop">
-        <input type="file" class="move-file-input" accept="image/*" hidden>
+        <input type="file" class="move-file-input" accept="image/*" multiple hidden>
         <span style="font-size:1.4rem">📷</span>
-        <span>Drop image</span>
+        <span>Drop image(s)</span>
       </div>
       <div class="move-thumb hidden">
         <img class="move-thumb-img" src="" alt="">
@@ -561,366 +342,11 @@
 
 <script>
 // ═══════════════════════════════════════════════════
-//  PRESETS
+//  BOOT
 // ═══════════════════════════════════════════════════
-const PRESETS = {
-  swap: `Remove the text and the Instagram layout. I want you to make the equivalent piece of clothing in Image 2 and replace it with Image 1 and make it look like it was meant to be in Image 1, replace it.`,
-};
-
-const MAX_BYTES = 20 * 1024 * 1024;
-const COST_EACH = 0.039;
-const MAX_CONC  = 2;
-
-// ═══════════════════════════════════════════════════
-//  API KEY / BOOT
-// ═══════════════════════════════════════════════════
-const setupEl     = document.getElementById("setup");
-const appEl       = document.getElementById("app");
-const apiKeyInput = document.getElementById("apiKeyInput");
-const saveKeyBtn  = document.getElementById("saveKeyBtn");
-const setupError  = document.getElementById("setupError");
-
-async function nanoInit() {
-  try {
-    const r = await fetch("/api/status");
-    const d = await r.json();
-    if (d.configured) showApp();
-    else setupEl.classList.remove("hidden");
-  } catch { setupEl.classList.remove("hidden"); }
-}
-
-function showApp() {
-  setupEl.classList.add("hidden");
-  appEl.classList.remove("hidden");
-  if (!jobsEl.children.length)     addFixJob();
+function boot() {
   if (!moveJobsEl.children.length) addMoveJob();
 }
-
-saveKeyBtn.addEventListener("click", async () => {
-  const key = apiKeyInput.value.trim();
-  setupError.textContent = "";
-  if (!key) { setupError.textContent = "Please enter your API key."; return; }
-  saveKeyBtn.disabled = true; saveKeyBtn.textContent = "Saving…";
-  try {
-    const r = await fetch("/api/save-key", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({api_key:key}) });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || "Could not save key.");
-    showApp();
-  } catch(e) { setupError.textContent = e.message; }
-  finally { saveKeyBtn.disabled = false; saveKeyBtn.textContent = "Save & Continue"; }
-});
-apiKeyInput.addEventListener("keydown", e => { if (e.key==="Enter") saveKeyBtn.click(); });
-
-// ═══════════════════════════════════════════════════
-//  FIX — multi-job grid
-// ═══════════════════════════════════════════════════
-const jobsEl          = document.getElementById("jobs");
-const addJobBtn       = document.getElementById("addJobBtn");
-const nanoGenBtn      = document.getElementById("nanoGenerateBtn");
-const animateAllBtn   = document.getElementById("animateAllBtn");
-const dlFixZipBtn     = document.getElementById("downloadFixZipBtn");
-const nanoErrEl       = document.getElementById("nanoError");
-const genCountEl      = document.getElementById("genCount");
-const costTotalEl     = document.getElementById("costTotal");
-
-let genCount  = 0;
-const fixJobs = [];
-
-function fixRenumber() {
-  [...jobsEl.children].forEach((card, i) => {
-    card.querySelector(".fix-num").textContent = `Image ${i + 1}`;
-  });
-}
-
-function addFixJob() {
-  const card = document.getElementById("fixCardTemplate").content.firstElementChild.cloneNode(true);
-  const job  = setupFixJob(card);
-  fixJobs.push(job);
-  jobsEl.appendChild(card);
-  fixRenumber();
-  return job;
-}
-
-function setupFixJob(card) {
-  const dropEl      = card.querySelector(".fix-drop");
-  const fileInput   = card.querySelector(".fix-file-input");
-  const sourceImg   = card.querySelector(".fix-source-img");
-  const dropEl2      = card.querySelector(".fix-drop2");
-  const fileInput2   = card.querySelector(".fix-file-input2");
-  const sourceImg2   = card.querySelector(".fix-source-img2");
-  const resultArea  = card.querySelector(".fix-result-area");
-  const spinner     = card.querySelector(".fix-spinner");
-  const placeholder = card.querySelector(".fix-result-placeholder");
-  const resultImg   = card.querySelector(".fix-result-img");
-  const presetSel   = card.querySelector(".fix-preset");
-  const promptEl    = card.querySelector(".fix-prompt");
-  const actionsEl   = card.querySelector(".fix-result-actions");
-  const dlBtn       = card.querySelector(".fix-dl");
-  const regenBtn    = card.querySelector(".fix-regen");
-  const animBtn     = card.querySelector(".fix-animate");
-  const removeBtn   = card.querySelector(".fix-remove");
-  const errEl       = card.querySelector(".fix-err");
-
-  const job = { card, file:null, file2:null, busy:false, resultDataUrl:null, resultFilename:null, setFile: null, setFile2: null };
-
-  function setFile(f) {
-    errEl.textContent = "";
-    if (!f) return;
-    if (!f.type.startsWith("image/")) { errEl.textContent = "Please choose an image file."; return; }
-    if (f.size > MAX_BYTES) { errEl.textContent = "Image too large. Max 20MB."; return; }
-    job.file = f;
-    const url = URL.createObjectURL(f);
-    sourceImg.src = url;
-    sourceImg.classList.remove("hidden");
-    dropEl.classList.add("hidden");
-  }
-
-  function setFile2(f) {
-    errEl.textContent = "";
-    if (!f) return;
-    if (!f.type.startsWith("image/")) { errEl.textContent = "Please choose an image file."; return; }
-    if (f.size > MAX_BYTES) { errEl.textContent = "Image too large. Max 20MB."; return; }
-    job.file2 = f;
-    const url = URL.createObjectURL(f);
-    sourceImg2.src = url;
-    sourceImg2.classList.remove("hidden");
-    dropEl2.classList.add("hidden");
-  }
-
-  dropEl.addEventListener("click", () => fileInput.click());
-  fileInput.addEventListener("change", e => setFile(e.target.files[0]));
-  ["dragenter","dragover"].forEach(ev => dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.add("dragover"); }));
-  ["dragleave","drop"].forEach(ev => dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.classList.remove("dragover"); }));
-  dropEl.addEventListener("drop", e => setFile(e.dataTransfer.files[0]));
-
-  dropEl2.addEventListener("click", () => fileInput2.click());
-  fileInput2.addEventListener("change", e => setFile2(e.target.files[0]));
-  ["dragenter","dragover"].forEach(ev => dropEl2.addEventListener(ev, e => { e.preventDefault(); dropEl2.classList.add("dragover"); }));
-  ["dragleave","drop"].forEach(ev => dropEl2.addEventListener(ev, e => { e.preventDefault(); dropEl2.classList.remove("dragover"); }));
-  dropEl2.addEventListener("drop", e => setFile2(e.dataTransfer.files[0]));
-
-  presetSel.addEventListener("change", () => { const p=PRESETS[presetSel.value]; if(p) promptEl.value=p; });
-  promptEl.addEventListener("input", () => { if(presetSel.value && promptEl.value!==PRESETS[presetSel.value]) presetSel.value=""; });
-  if (presetSel.value && PRESETS[presetSel.value]) promptEl.value = PRESETS[presetSel.value];
-
-  removeBtn.addEventListener("click", () => {
-    const i = fixJobs.indexOf(job);
-    if (i !== -1) fixJobs.splice(i, 1);
-    card.remove(); fixRenumber();
-  });
-
-  // "↻ Regenerate" — re-run this job with the same images/prompt
-  regenBtn.addEventListener("click", () => { if (!job.busy) job.run(); });
-
-  // "→ Animate" — single image to Move
-  animBtn.addEventListener("click", () => {
-    if (!job.resultDataUrl) return;
-    const mj = addMoveJob();
-    mj.setFile(dataUrlToFile(job.resultDataUrl, job.resultFilename || "result.png"));
-    document.getElementById("moveJobs").lastElementChild.scrollIntoView({ behavior:"smooth", block:"start" });
-  });
-
-  job.run = async function() {
-    errEl.textContent = "";
-    if (!job.file)                { errEl.textContent = "Upload a reference image (Image 1) first."; return false; }
-    if (!job.file2)               { errEl.textContent = "Upload your item image (Image 2) first."; return false; }
-    if (!promptEl.value.trim())   { errEl.textContent = "Enter a prompt first.";  return false; }
-    job.busy = true;
-    resultArea.classList.remove("hidden");
-    spinner.classList.remove("hidden");
-    placeholder.textContent = "Generating…";
-    resultImg.classList.add("hidden");
-    actionsEl.classList.add("hidden");
-
-    const form = new FormData();
-    form.append("image",  job.file);
-    form.append("image2", job.file2);
-    form.append("prompt", promptEl.value.trim());
-    try {
-      const r = await fetch("/api/generate", { method:"POST", body:form });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Generation failed.");
-      resultImg.src = d.image; resultImg.classList.remove("hidden");
-      placeholder.textContent = "";
-      dlBtn.href = d.download_url; dlBtn.setAttribute("download", d.filename||"result.png"); dlBtn.classList.remove("hidden");
-      regenBtn.classList.remove("hidden");
-      animBtn.classList.remove("hidden");
-      actionsEl.classList.remove("hidden");
-      job.resultDataUrl  = d.image;
-      job.resultFilename = d.filename || "result.png";
-      return true;
-    } catch(e) { errEl.textContent = e.message; placeholder.textContent = "Failed."; return false; }
-    finally { job.busy=false; spinner.classList.add("hidden"); }
-  };
-
-  job.setFile  = setFile;
-  job.setFile2 = setFile2;
-  return job;
-}
-
-// Multi-file "Add images" flow
-const addImagesInput = document.getElementById("addImagesInput");
-
-function addFilesAsJobs(files) {
-  for (const f of files) {
-    if (!f.type.startsWith("image/")) continue;
-    const job = addFixJob();
-    job.setFile(f);
-  }
-}
-
-addJobBtn.addEventListener("click", () => addImagesInput.click());
-addImagesInput.addEventListener("change", e => {
-  if (e.target.files.length) addFilesAsJobs(e.target.files);
-  addImagesInput.value = "";
-});
-
-// Global drop zone — drag images anywhere onto the Fix section
-const fixSection = document.getElementById("jobs").closest(".page");
-fixSection.addEventListener("dragover", e => {
-  if ([...e.dataTransfer.items].some(i => i.kind === "file" && i.type.startsWith("image/"))) {
-    e.preventDefault();
-    jobsEl.style.outline = "2px dashed var(--accent)";
-    jobsEl.style.outlineOffset = "4px";
-  }
-});
-fixSection.addEventListener("dragleave", e => {
-  if (!fixSection.contains(e.relatedTarget)) {
-    jobsEl.style.outline = "";
-    jobsEl.style.outlineOffset = "";
-  }
-});
-fixSection.addEventListener("drop", e => {
-  jobsEl.style.outline = "";
-  jobsEl.style.outlineOffset = "";
-  const imgs = [...e.dataTransfer.files].filter(f => f.type.startsWith("image/"));
-  if (!imgs.length) return;
-  e.preventDefault();
-  addFilesAsJobs(imgs);
-});
-
-// Generate all → auto-download ZIP of results
-nanoGenBtn.addEventListener("click", async () => {
-  nanoErrEl.textContent = "";
-  if (!fixJobs.length) return;
-  nanoGenBtn.disabled = true; addJobBtn.disabled = true; nanoGenBtn.textContent = "Generating…";
-
-  const queue = [...fixJobs]; let succeeded = 0;
-  async function worker() { while (queue.length) { const j=queue.shift(); if(await j.run()) succeeded++; } }
-  await Promise.all(Array.from({length:Math.min(MAX_CONC,fixJobs.length)}, worker));
-
-  genCount += succeeded;
-  genCountEl.textContent  = genCount;
-  costTotalEl.textContent = (genCount * COST_EACH).toFixed(2);
-  nanoGenBtn.disabled = false; addJobBtn.disabled = false; nanoGenBtn.textContent = "Generate all";
-
-  const withResults = fixJobs.filter(j => j.resultDataUrl);
-  if (withResults.length) {
-    animateAllBtn.classList.remove("hidden");
-    dlFixZipBtn.classList.remove("hidden");
-    if (withResults.length > 1) await downloadZip(withResults.map(j=>({dataUrl:j.resultDataUrl,name:j.resultFilename||"result.png"})), "fix-results.zip");
-    else { // single result — just trigger the download link
-      const a = document.createElement("a"); a.href = withResults[0].resultDataUrl;
-      a.download = withResults[0].resultFilename || "result.png"; a.click();
-    }
-  }
-});
-
-// Manual ZIP button
-dlFixZipBtn.addEventListener("click", async () => {
-  const withResults = fixJobs.filter(j => j.resultDataUrl);
-  if (!withResults.length) return;
-  await downloadZip(withResults.map(j=>({dataUrl:j.resultDataUrl,name:j.resultFilename||"result.png"})), "fix-results.zip");
-});
-
-// Animate ALL results → create move jobs for each
-animateAllBtn.addEventListener("click", () => {
-  const withResults = fixJobs.filter(j => j.resultDataUrl);
-  if (!withResults.length) return;
-  for (const fj of withResults) {
-    const mj = addMoveJob();
-    mj.setFile(dataUrlToFile(fj.resultDataUrl, fj.resultFilename || "result.png"));
-  }
-  document.getElementById("moveJobs").scrollIntoView({ behavior:"smooth", block:"start" });
-});
-
-// ═══════════════════════════════════════════════════
-//  SS — grab still frames from a video, send to Fix
-// ═══════════════════════════════════════════════════
-const ssDrop       = document.querySelector(".ss-drop");
-const ssFileInput  = document.getElementById("ssFileInput");
-const ssPlayer     = document.getElementById("ssPlayer");
-const ssVideo      = document.getElementById("ssVideo");
-const ssControls   = document.getElementById("ssControls");
-const ssCaptureBtn = document.getElementById("ssCaptureBtn");
-const ssChangeBtn  = document.getElementById("ssChangeBtn");
-const ssStatusEl   = document.getElementById("ssStatus");
-const ssThumbsEl   = document.getElementById("ssThumbs");
-
-let ssStatusTimer = null;
-function ssSetStatus(msg) {
-  ssStatusEl.textContent = msg;
-  clearTimeout(ssStatusTimer);
-  ssStatusTimer = setTimeout(() => { ssStatusEl.textContent = ""; }, 3000);
-}
-
-function ssFormatTime(t) {
-  const m = Math.floor(t / 60), s = Math.floor(t % 60);
-  return `${m}:${String(s).padStart(2,"0")}`;
-}
-
-function ssSetVideo(file) {
-  if (!file) return;
-  if (!file.type.startsWith("video/")) { ssSetStatus("Please choose a video file."); return; }
-  const url = URL.createObjectURL(file);
-  ssVideo.src = url;
-  ssPlayer.classList.remove("hidden");
-  ssDrop.classList.add("hidden");
-  ssControls.classList.remove("hidden");
-  ssCaptureBtn.disabled = true;
-}
-
-ssVideo.addEventListener("loadedmetadata", () => { ssCaptureBtn.disabled = false; });
-
-ssDrop.addEventListener("click", () => ssFileInput.click());
-ssFileInput.addEventListener("change", e => ssSetVideo(e.target.files[0]));
-["dragenter","dragover"].forEach(ev => ssDrop.addEventListener(ev, e => { e.preventDefault(); ssDrop.classList.add("dragover"); }));
-["dragleave","drop"].forEach(ev => ssDrop.addEventListener(ev, e => { e.preventDefault(); ssDrop.classList.remove("dragover"); }));
-ssDrop.addEventListener("drop", e => ssSetVideo(e.dataTransfer.files[0]));
-
-ssChangeBtn.addEventListener("click", () => {
-  ssVideo.pause();
-  ssVideo.removeAttribute("src"); ssVideo.load();
-  ssPlayer.classList.add("hidden");
-  ssControls.classList.add("hidden");
-  ssDrop.classList.remove("hidden");
-  ssFileInput.value = "";
-});
-
-setupScrubber(ssVideo, ssPlayer.querySelector(".vscrub-play"), ssPlayer.querySelector(".vscrub-range"), ssPlayer.querySelector(".vscrub-time"));
-
-ssCaptureBtn.addEventListener("click", () => {
-  if (!ssVideo.videoWidth) return;
-  const t = ssVideo.currentTime;
-  const canvas = document.createElement("canvas");
-  canvas.width  = ssVideo.videoWidth;
-  canvas.height = ssVideo.videoHeight;
-  canvas.getContext("2d").drawImage(ssVideo, 0, 0, canvas.width, canvas.height);
-  canvas.toBlob(blob => {
-    if (!blob) { ssSetStatus("Capture failed — try again."); return; }
-    const filename = `frame-${Math.round(t*1000)}.png`;
-    const file = new File([blob], filename, { type:"image/png" });
-
-    const thumb = document.createElement("div");
-    thumb.className = "ss-thumb";
-    thumb.innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="frame at ${ssFormatTime(t)}"><span class="ss-thumb-time">${ssFormatTime(t)}</span>`;
-    ssThumbsEl.appendChild(thumb);
-
-    const job = addFixJob();
-    job.setFile(file);
-    ssSetStatus(`Captured frame at ${ssFormatTime(t)} → added to Fix ✓`);
-  }, "image/png");
-});
 
 // ═══════════════════════════════════════════════════
 //  MOVE — client-side shake, multi-job grid
@@ -1012,6 +438,13 @@ function setupMoveJob(card) {
     genBtn.disabled = false; errEl.textContent = "";
     clearResult();
   }
+  // Accepts multiple files: the first fills this job, any extras spawn new job cards.
+  function setFiles(files) {
+    const imgs = [...files].filter(f => f.type.startsWith("image/"));
+    if (!imgs.length) return;
+    setFile(imgs[0]);
+    for (const f of imgs.slice(1)) addMoveJob().setFile(f);
+  }
   function clearFile() {
     job.file = null; fileInput.value = "";
     thumbBox.classList.add("hidden"); dropEl.classList.remove("hidden");
@@ -1022,10 +455,10 @@ function setupMoveJob(card) {
   }
 
   dropEl.addEventListener("click", () => fileInput.click());
-  fileInput.addEventListener("change", e => setFile(e.target.files[0]));
+  fileInput.addEventListener("change", e => { setFiles(e.target.files); fileInput.value = ""; });
   dropEl.addEventListener("dragover", e=>{e.preventDefault();dropEl.classList.add("over");});
   dropEl.addEventListener("dragleave",()=>dropEl.classList.remove("over"));
-  dropEl.addEventListener("drop",e=>{e.preventDefault();dropEl.classList.remove("over");setFile(e.dataTransfer.files[0]);});
+  dropEl.addEventListener("drop",e=>{e.preventDefault();dropEl.classList.remove("over");setFiles(e.dataTransfer.files);});
   thumbRm.addEventListener("click", clearFile);
 
   removeBtn.addEventListener("click", () => {
@@ -1092,11 +525,22 @@ function setupMoveJob(card) {
   };
 
   genBtn.addEventListener("click", ()=>job.run());
-  job.setFile = setFile;
+  job.setFile  = setFile;
+  job.setFiles = setFiles;
   return job;
 }
 
-addMoveJobBtn.addEventListener("click", addMoveJob);
+// "+ Add video" opens a multi-file picker — each selected image gets its own job card.
+const addMoveInput = document.createElement("input");
+addMoveInput.type = "file"; addMoveInput.accept = "image/*"; addMoveInput.multiple = true; addMoveInput.hidden = true;
+document.body.appendChild(addMoveInput);
+addMoveJobBtn.addEventListener("click", () => addMoveInput.click());
+addMoveInput.addEventListener("change", e => {
+  const imgs = [...e.target.files].filter(f => f.type.startsWith("image/"));
+  if (imgs.length) imgs.forEach(f => addMoveJob().setFile(f));
+  else addMoveJob();
+  addMoveInput.value = "";
+});
 
 moveGenAllBtn.addEventListener("click", async () => {
   if (!moveJobs.length) return;
@@ -1384,26 +828,8 @@ function buildShakePath(frames,intensity,speed,seed,direction,w,h) {
   return out;
 }
 
-async function downloadZip(items, filename) {
-  const zip=new JSZip();
-  for (const {dataUrl,name} of items) {
-    const [,b64]=dataUrl.split(","); zip.file(name,b64,{base64:true});
-  }
-  const blob=await zip.generateAsync({type:"blob"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a"); a.href=url; a.download=filename; a.click();
-}
-
-function dataUrlToFile(dataUrl,filename) {
-  const [header,b64]=dataUrl.split(",");
-  const mime=header.match(/:(.*?);/)[1];
-  const bytes=atob(b64); const arr=new Uint8Array(bytes.length);
-  for (let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
-  return new File([new Blob([arr],{type:mime})],filename,{type:mime});
-}
-
 // Boot
-nanoInit();
+boot();
 </script>
 </body>
 </html>

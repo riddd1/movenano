@@ -1,7 +1,5 @@
 flask
 gunicorn
-google-genai
-python-dotenv
 opencv-python-headless
 numpy
 imageio-ffmpeg
